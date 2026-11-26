@@ -50,6 +50,7 @@ Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
 | `otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
 | `otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
 | `signoz.yaml`                 | SigNoz on management                                     |
+| `signoz-dashboards.yaml`      | Imports `observability/dashboards/signoz` into SigNoz    |
 | `queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
 | `projects/`                   | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
 

@@ -30,7 +30,7 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 
 | UI           | URL                         | Login           |
 | ------------ | --------------------------- | --------------- |
-| SigNoz       | http://localhost:3301       | create on first visit |
+| SigNoz       | http://localhost:3301       | `admin@playground.local` / `Playground123!` |
 | Grafana (LGTM) | http://localhost:3000     | `admin` / `admin` |
 | Argo CD      | https://localhost:9000      | `admin` / `123` |
 
@@ -62,6 +62,8 @@ cluster. The cluster is the environment boundary, and telemetry carries it as
 queue-consumer emits a trace and a `messages.processed` count every 5 seconds
 per replica, so prod should show about 3x internal's rate.
 
+- **Dashboard "queue-consumer overview"**: in both SigNoz (Dashboards) and Grafana
+  (Dashboards → k8s-observability-poc). Same panels, loaded from git
 - **SigNoz → Services → `queue-consumer`**: switch environments, compare throughput
 - **Grafana → Explore → Tempo**: service `queue-consumer`, span `do_work`
 - **Grafana → Explore → Prometheus**: `rate(messages_processed_total[1m])` (resource attributes like the environment sit on `target_info`)
