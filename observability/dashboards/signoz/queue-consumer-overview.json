@@ -1,0 +1,902 @@
+{
+  "name": "queue-consumer-overview",
+  "schemaVersion": "v6",
+  "tags": [
+    {
+      "key": "source",
+      "value": "k8s-observability-poc"
+    }
+  ],
+  "spec": {
+    "display": {
+      "name": "queue-consumer overview",
+      "description": "Same panels as the Grafana dashboard of the same name. Managed in git (k8s-observability-poc/observability/dashboards) and locked; edit the JSON, not the UI."
+    },
+    "duration": "1h",
+    "links": [],
+    "variables": [
+      {
+        "kind": "ListVariable",
+        "spec": {
+          "name": "env",
+          "display": {
+            "name": "environment"
+          },
+          "allowAllValue": true,
+          "allowMultiple": true,
+          "sort": "alphabetical-asc",
+          "plugin": {
+            "kind": "signoz/DynamicVariable",
+            "spec": {
+              "name": "deployment.environment.name",
+              "signal": "metrics"
+            }
+          }
+        }
+      }
+    ],
+    "panels": {
+      "messages-rate": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Messages processed / s",
+            "description": "messages.processed counter from the OTel SDK. Each replica processes one message every 5 s, so prod (3 replicas) should run at ~3x internal."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "ops",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "metrics",
+                    "aggregations": [
+                      {
+                        "metricName": "messages.processed",
+                        "timeAggregation": "rate",
+                        "spaceAggregation": "sum"
+                      }
+                    ],
+                    "filter": {
+                      "expression": "deployment.environment.name IN $env"
+                    },
+                    "groupBy": [
+                      {
+                        "name": "deployment.environment.name",
+                        "fieldDataType": "string"
+                      }
+                    ],
+                    "legend": "{{deployment.environment.name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "error-ratio": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "do_work error ratio",
+            "description": "Share of do_work spans with error status, from the agent's span_metrics connector (traces.span.metrics.calls)."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "percentunit",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "composite",
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "A",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "traces.span.metrics.calls",
+                              "timeAggregation": "rate",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND status.code = 'STATUS_CODE_ERROR' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "",
+                          "disabled": true
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "B",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "traces.span.metrics.calls",
+                              "timeAggregation": "rate",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "",
+                          "disabled": true
+                        }
+                      },
+                      {
+                        "type": "builder_formula",
+                        "spec": {
+                          "name": "F1",
+                          "expression": "A / B",
+                          "legend": "{{deployment.environment.name}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "duration": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "do_work duration (p50 / p95 / p99)",
+            "description": "From traces.span.metrics.duration (agent span_metrics connector). Buckets start at 0.1 ms."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "ms",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "composite",
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "A",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "traces.span.metrics.duration",
+                              "spaceAggregation": "p50"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "p50 {{deployment.environment.name}}"
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "B",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "traces.span.metrics.duration",
+                              "spaceAggregation": "p95"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "p95 {{deployment.environment.name}}"
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "C",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "traces.span.metrics.duration",
+                              "spaceAggregation": "p99"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "p99 {{deployment.environment.name}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "replicas": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Replicas: available vs desired",
+            "description": "From otel-k8s-state (k8s_cluster receiver)."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "composite",
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "A",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.deployment.available",
+                              "timeAggregation": "latest",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.deployment.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "available {{deployment.environment.name}}"
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "B",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.deployment.desired",
+                              "timeAggregation": "latest",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.deployment.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "desired {{deployment.environment.name}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "cpu": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "CPU per pod",
+            "description": "Kubelet stats from the otel-agent, with the container limit."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "short",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "composite",
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "A",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.pod.cpu.usage",
+                              "timeAggregation": "avg",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            },
+                            {
+                              "name": "k8s.pod.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "{{deployment.environment.name}} {{k8s.pod.name}}"
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "B",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.container.cpu_limit",
+                              "timeAggregation": "latest",
+                              "spaceAggregation": "max"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "limit {{deployment.environment.name}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "memory": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Memory per pod (working set)",
+            "description": "Kubelet stats from the otel-agent, with the container limit (OOMKill above it)."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "By",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "composite",
+                "plugin": {
+                  "kind": "signoz/CompositeQuery",
+                  "spec": {
+                    "queries": [
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "A",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.pod.memory.working_set",
+                              "timeAggregation": "avg",
+                              "spaceAggregation": "sum"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            },
+                            {
+                              "name": "k8s.pod.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "{{deployment.environment.name}} {{k8s.pod.name}}"
+                        }
+                      },
+                      {
+                        "type": "builder_query",
+                        "spec": {
+                          "name": "B",
+                          "signal": "metrics",
+                          "aggregations": [
+                            {
+                              "metricName": "k8s.container.memory_limit",
+                              "timeAggregation": "latest",
+                              "spaceAggregation": "max"
+                            }
+                          ],
+                          "filter": {
+                            "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                          },
+                          "groupBy": [
+                            {
+                              "name": "deployment.environment.name",
+                              "fieldDataType": "string"
+                            }
+                          ],
+                          "legend": "limit {{deployment.environment.name}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "restarts": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Container restarts",
+            "description": "Total container restarts (otel-k8s-state). Anything above 0 means crashes or OOM kills."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/NumberPanel",
+            "spec": {
+              "formatting": {
+                "decimalPrecision": "0"
+              },
+              "thresholds": [
+                {
+                  "color": "#F1575F",
+                  "format": "background",
+                  "operator": "above",
+                  "value": 0
+                }
+              ]
+            }
+          },
+          "queries": [
+            {
+              "kind": "scalar",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "metrics",
+                    "aggregations": [
+                      {
+                        "metricName": "k8s.container.restarts",
+                        "timeAggregation": "latest",
+                        "spaceAggregation": "sum",
+                        "reduceTo": "last"
+                      }
+                    ],
+                    "filter": {
+                      "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                    },
+                    "groupBy": [],
+                    "legend": ""
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "pods-running": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Pods by phase",
+            "description": "k8s.pod.phase per pod: 1 Pending, 2 Running, 3 Succeeded, 4 Failed, 5 Unknown. ImagePullBackOff pods stay at 1."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/TimeSeriesPanel",
+            "spec": {
+              "formatting": {
+                "unit": "",
+                "decimalPrecision": "2"
+              },
+              "legend": {
+                "position": "bottom"
+              }
+            }
+          },
+          "queries": [
+            {
+              "kind": "time_series",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "metrics",
+                    "aggregations": [
+                      {
+                        "metricName": "k8s.pod.phase",
+                        "timeAggregation": "latest",
+                        "spaceAggregation": "max"
+                      }
+                    ],
+                    "filter": {
+                      "expression": "k8s.namespace.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                    },
+                    "groupBy": [
+                      {
+                        "name": "deployment.environment.name",
+                        "fieldDataType": "string"
+                      },
+                      {
+                        "name": "k8s.pod.name",
+                        "fieldDataType": "string"
+                      }
+                    ],
+                    "legend": "{{deployment.environment.name}} {{k8s.pod.name}}"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "logs": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "queue-consumer logs",
+            "description": "Container stdout, shipped from /var/log/pods by the otel-agent."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/ListPanel",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "raw",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "logs",
+                    "filter": {
+                      "expression": "service.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                    },
+                    "order": [
+                      {
+                        "key": {
+                          "name": "timestamp"
+                        },
+                        "direction": "desc"
+                      }
+                    ],
+                    "limit": 100
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "events": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Kubernetes warning events",
+            "description": "Kubernetes events (k8sobjects receiver in otel-k8s-state): failed pulls, OOM kills, scheduling failures."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/ListPanel",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "raw",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "logs",
+                    "filter": {
+                      "expression": "k8s.namespace.name = 'queue-consumer' AND event.domain = 'k8s' AND body CONTAINS 'Warning' AND deployment.environment.name IN $env"
+                    },
+                    "order": [
+                      {
+                        "key": {
+                          "name": "timestamp"
+                        },
+                        "direction": "desc"
+                      }
+                    ],
+                    "limit": 100
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "traces": {
+        "kind": "Panel",
+        "spec": {
+          "display": {
+            "name": "Recent do_work traces",
+            "description": "Spans from queue-consumer. Click one to open the trace."
+          },
+          "links": [],
+          "plugin": {
+            "kind": "signoz/ListPanel",
+            "spec": {}
+          },
+          "queries": [
+            {
+              "kind": "raw",
+              "spec": {
+                "name": "A",
+                "plugin": {
+                  "kind": "signoz/BuilderQuery",
+                  "spec": {
+                    "name": "A",
+                    "signal": "traces",
+                    "filter": {
+                      "expression": "service.name = 'queue-consumer' AND name = 'do_work' AND deployment.environment.name IN $env"
+                    },
+                    "order": [
+                      {
+                        "key": {
+                          "name": "timestamp"
+                        },
+                        "direction": "desc"
+                      }
+                    ],
+                    "limit": 50
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "layouts": [
+      {
+        "kind": "Grid",
+        "spec": {
+          "items": [
+            {
+              "content": {
+                "$ref": "#/spec/panels/messages-rate"
+              },
+              "x": 0,
+              "y": 0,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/error-ratio"
+              },
+              "x": 4,
+              "y": 0,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/duration"
+              },
+              "x": 8,
+              "y": 0,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/replicas"
+              },
+              "x": 0,
+              "y": 6,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/cpu"
+              },
+              "x": 4,
+              "y": 6,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/memory"
+              },
+              "x": 8,
+              "y": 6,
+              "width": 4,
+              "height": 6
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/restarts"
+              },
+              "x": 0,
+              "y": 12,
+              "width": 6,
+              "height": 4
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/pods-running"
+              },
+              "x": 6,
+              "y": 12,
+              "width": 6,
+              "height": 4
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/logs"
+              },
+              "x": 0,
+              "y": 16,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/events"
+              },
+              "x": 6,
+              "y": 16,
+              "width": 6,
+              "height": 8
+            },
+            {
+              "content": {
+                "$ref": "#/spec/panels/traces"
+              },
+              "x": 0,
+              "y": 24,
+              "width": 12,
+              "height": 7
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

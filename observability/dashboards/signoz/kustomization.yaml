@@ -1,0 +1,24 @@
+# SigNoz dashboards from git, synced by argocd/signoz-dashboards.yaml.
+# SigNoz has no file-based provisioning, so the dashboard JSON files become a
+# ConfigMap and a PostSync Job (job.yaml, import.sh) pushes them through
+# SigNoz's v2 dashboards API. To add a dashboard, drop its JSON (v6 schema,
+# with a fixed `name`) here and list it below.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: signoz
+resources:
+  - job.yaml
+configMapGenerator:
+  - name: signoz-dashboards
+    files:
+      - queue-consumer-overview.json
+  - name: signoz-dashboards-import
+    files:
+      - import.sh
+secretGenerator:
+  # Must match signoz_user_root_* in observability/signoz/values.yaml.
+  # PoC-only fixed credentials, like Argo CD's admin/123.
+  - name: signoz-dashboards-login
+    literals:
+      - email=admin@playground.local
+      - password=Playground123!
