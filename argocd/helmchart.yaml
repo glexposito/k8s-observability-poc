@@ -10,7 +10,7 @@ metadata:
 spec:
   repo: https://argoproj.github.io/argo-helm
   chart: argo-cd
-  version: 10.8.4 # Argo CD v3.5.2
+  version: 10.20.0 # Argo CD v3.6.3
   targetNamespace: argocd
   createNamespace: true
   timeout: 600s
