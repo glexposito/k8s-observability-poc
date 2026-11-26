@@ -30,7 +30,7 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 
 | UI           | URL                         | Login           |
 | ------------ | --------------------------- | --------------- |
-| SigNoz       | http://localhost:8080       | create on first visit |
+| SigNoz       | http://localhost:3301       | create on first visit |
 | Grafana (LGTM) | http://localhost:3000     | `admin` / `admin` |
 | Argo CD      | https://localhost:9000      | `admin` / `123` |
 

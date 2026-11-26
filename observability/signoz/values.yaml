@@ -10,5 +10,8 @@ clusterName: management
 signoz:
   service:
     type: NodePort
-    # UI, published on the host as localhost:8080 (docker-compose.yaml).
+    # UI, published on the host as localhost:3301 (docker-compose.yaml).
     nodePort: 30301
+  env:
+    # Used in alert notification links; must match the host port above.
+    signoz_alertmanager_signoz_external__url: http://localhost:3301

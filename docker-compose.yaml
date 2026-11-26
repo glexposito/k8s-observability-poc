@@ -121,8 +121,9 @@ services:
       # Argo CD UI - argocd/helmchart.yaml sets server.service.type=NodePort
       # on 30090, so this is reachable directly, no kubectl port-forward.
       - "9000:30090"
-      # SigNoz UI (observability/signoz/values.yaml, NodePort 30301).
-      - "8080:30301"
+      # SigNoz UI (observability/signoz/values.yaml, NodePort 30301). 3301 is
+      # SigNoz's traditional port and keeps 8080 free for other local tools.
+      - "3301:30301"
       # OTel gateway OTLP gRPC/HTTP (observability/otel-gateway/values.yaml),
       # so you can also send telemetry from the host straight to the gateway.
       - "4317:30317"

@@ -63,7 +63,7 @@ docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-co
   traces --otlp-insecure --otlp-endpoint localhost:4317 --traces 20 --service telemetrygen
 ```
 
-Then look for `telemetrygen` in SigNoz (http://localhost:8080) and in Grafana →
+Then look for `telemetrygen` in SigNoz (http://localhost:3301) and in Grafana →
 Explore → Tempo (http://localhost:3000).
 
 **Footprint:** SigNoz (ClickHouse + ZooKeeper) plus LGTM add several GiB on

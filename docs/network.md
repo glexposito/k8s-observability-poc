@@ -52,7 +52,7 @@ masquerades pod egress behind the node's address.
 
 | Host port                | Target                        | What                          |
 | ------------------------ | ----------------------------- | ----------------------------- |
-| `8080`                   | management `:30301`           | SigNoz UI                     |
+| `3301`                   | management `:30301`           | SigNoz UI                     |
 | `3000`                   | lgtm `:3000`                  | Grafana                       |
 | `9000`                   | management `:30090`           | Argo CD UI/API (HTTPS)        |
 | `4317` / `4318`          | management `:30317/:30318`    | otel-gateway OTLP gRPC / HTTP |
