@@ -5,8 +5,8 @@ resources:
 replicas:
   - name: queue-consumer
     count: 2
-# Pin a digest once CI has published one:
-#   kustomize edit set image ghcr.io/glexposito/queue-consumer@sha256:<digest>
+# Pinned digest, published by queue-consumer's publish workflow (sha-1d39b66).
+# Bump with: kustomize edit set image ghcr.io/glexposito/queue-consumer@sha256:<digest>
 images:
   - name: ghcr.io/glexposito/queue-consumer
-    newTag: latest
+    digest: sha256:4de62e1454d80da50a4c01a67045c0482aa197fae09fc0211e816af5c693af1b
