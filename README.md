@@ -1,33 +1,82 @@
 # k8s-observability-poc
 
-A throwaway local GitOps playground: four k3s clusters in Docker, one Argo CD
-managing internal/stg/prod, KEDA autoscaling queue workers, and a pipeline
-promoting [pulse-api](https://github.com/glexposito/pulse-api) through the
-stages. KISS.
+A throwaway local **Kubernetes observability playground**. Four k3s clusters
+run in Docker, with real workloads producing real signals. One vendor-neutral
+**OpenTelemetry** pipeline collects metrics, logs and traces from every
+environment and sends the same data to two backends side by side: **SigNoz**
+and **Grafana LGTM**. KISS.
+
+## Goals
+
+- **Learn and compare Kubernetes observability** on something shaped like a
+  real platform: a management cluster plus internal/stg/prod.
+- **Standard OpenTelemetry only:** the upstream collector chart and k8s
+  distribution, OTLP on every hop, semantic-convention attributes
+  (`k8s.cluster.name`, `deployment.environment.name`). No vendor agents.
+- **Backend-agnostic:** SigNoz and LGTM get identical data, so you can compare
+  them fairly. Adding or swapping a backend means editing one file.
+- **A real instrumented workload:** [queue-consumer](https://github.com/glexposito/queue-consumer),
+  a Rust worker using the OTel SDK, runs in every environment (1 / 2 / 3 replicas).
+- **Everything through GitOps:** Argo CD on management deploys all of it from
+  this repo.
 
 ## TL;DR
 
 ```bash
-docker compose up -d      # first start takes a few minutes
+docker compose up -d      # first start takes a few minutes (SigNoz the longest)
 ```
 
-Argo CD: **https://localhost:9000** (`admin` / `123`). You only need Docker.
+You only need Docker, with about 12-16 GiB of RAM for it.
 
-| Cluster    | API              | pulse-api        | Runs                                        |
-| ---------- | ---------------- | ---------------- | ------------------------------------------- |
-| management | `localhost:6447` |                  | Argo CD                                     |
-| internal   | `localhost:6444` | `localhost:8081` | core-workers (max 5), pulse-api (1 replica) |
-| stg        | `localhost:6446` | `localhost:8082` | core-workers (max 10), pulse-api (2)        |
-| prod       | `localhost:6445` | `localhost:8083` | core-workers (max 20), pulse-api (3)        |
+| UI           | URL                         | Login           |
+| ------------ | --------------------------- | --------------- |
+| SigNoz       | http://localhost:8080       | create on first visit |
+| Grafana (LGTM) | http://localhost:3000     | `admin` / `admin` |
+| Argo CD      | https://localhost:9000      | `admin` / `123` |
+
+## What runs where
+
+```
+ internal / stg / prod (each)                        management
+ ┌─────────────────────────────────────┐            ┌─────────────────────────────┐
+ │ queue-consumer                      │            │ Argo CD ── syncs everything │
+ │ otel-agent      1 per node          │ ─ OTLP ──► │ otel-gateway (2 replicas) ──┼──► SigNoz (in-cluster)
+ │ otel-k8s-state  1 per cluster       │            │                             │──► LGTM (Compose)
+ └─────────────────────────────────────┘            └─────────────────────────────┘
+   collection layer (agents)                          gateway layer
+```
+
+| Cluster    | API              | Runs                                          |
+| ---------- | ---------------- | --------------------------------------------- |
+| management | `localhost:6447` | Argo CD, otel-gateway, SigNoz                 |
+| internal   | `localhost:6444` | queue-consumer (1 replica), OTel collectors   |
+| stg        | `localhost:6446` | queue-consumer (2 replicas), OTel collectors  |
+| prod       | `localhost:6445` | queue-consumer (3 replicas), OTel collectors  |
+
+One namespace per app (`queue-consumer`, `observability`), the same on every
+cluster. The cluster is the environment boundary, and telemetry carries it as
+`deployment.environment.name`.
 
 ## Try it
 
-```bash
-./scripts/queue-messages.sh add 100                      # KEDA scales the workers up
-docker exec k3s-prod kubectl -n core-workers get pods -w
-./scripts/queue-messages.sh remove 100                   # ...and back to zero
+queue-consumer emits a trace and a `messages.processed` count every 5 seconds
+per replica, so prod should show about 3x internal's rate.
 
-curl localhost:8083/hostname                             # pulse-api on prod: which pod answered
+- **SigNoz → Services → `queue-consumer`**: switch environments, compare throughput
+- **Grafana → Explore → Tempo**: service `queue-consumer`, span `do_work`
+- **Grafana → Explore → Prometheus**: `rate(messages_processed_total[1m])` (resource attributes like the environment sit on `target_info`)
+- **Grafana → Explore → Loki**: `{k8s_namespace_name="queue-consumer"}` (stdout, shipped by the otel-agent)
+
+```bash
+docker exec k3s-prod kubectl -n queue-consumer get pods
+docker exec k3s-prod kubectl -n queue-consumer scale deploy/queue-consumer --replicas=5   # Argo CD reverts it (selfHeal)
+```
+
+Send synthetic traces straight to the gateway:
+
+```bash
+docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
+  traces --otlp-insecure --otlp-endpoint localhost:4317 --traces 20 --service telemetrygen
 ```
 
 ## Tear down
@@ -39,6 +88,7 @@ docker compose down -v    # wipe everything
 
 ## Docs
 
-- [architecture.md](docs/architecture.md): clusters, Argo CD, the two apps
-- [ci-setup.md](docs/ci-setup.md): pulse-api pipeline, runner, credentials
+- [observability.md](docs/observability.md): OpenTelemetry agents and gateway, SigNoz, LGTM
+- [network.md](docs/network.md): Docker network, fixed IPs, ports, DNS overrides, traffic flows, NetworkPolicies
+- [architecture.md](docs/architecture.md): clusters, namespaces, Argo CD, queue-consumer
 - [kustomize-conventions.md](docs/kustomize-conventions.md): the Kustomize standard

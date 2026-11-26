@@ -2,7 +2,8 @@
 
 ## Clusters and bootstrap
 
-Four single-node k3s clusters in Docker: **management** runs only Argo CD, and
+Four single-node k3s clusters in Docker: **management** runs the platform
+(Argo CD, plus the observability stack in [observability.md](observability.md)), and
 **internal / stg / prod** run the workloads. Keeping Argo CD on its own
 cluster means losing a workload cluster never takes down the thing that
 manages it.
@@ -15,51 +16,57 @@ manages it.
 3. `argocd-bootstrap` registers internal/stg/prod with Argo CD and applies
    `argocd/root-app.yaml`. From then on, Argo CD manages everything from git.
 
+For IPs, ports, DNS and traffic flows, see [network.md](network.md).
+
 There's no `kubectl` on the host. Each cluster ships its own:
 `docker exec k3s-<cluster> kubectl …`.
 
 ## Namespaces
 
-| Namespace      | Clusters           | Notes                                       |
-| -------------- | ------------------ | ------------------------------------------- |
-| `core-workers` | internal, stg, prod | KEDA-scaled queue workers                  |
-| `pulse-api`    | internal, stg, prod | Promoted by pulse-api's pipeline           |
-| `argocd`       | management         | The only thing management runs              |
+| Namespace        | Clusters            | Notes                                              |
+| ---------------- | ------------------- | -------------------------------------------------- |
+| `queue-consumer` | internal, stg, prod | The workload: 1 / 2 / 3 replicas                   |
+| `observability`  | all four            | OTel agents (workload clusters), OTel gateway (management) |
+| `argocd`         | management          | Argo CD                                            |
+| `signoz`         | management          | SigNoz + ClickHouse                                |
 
-Names have no stage suffix, because each cluster is one environment. Each
-workload namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
+**One namespace per app, not per environment.** Each cluster is one
+environment, so names have no stage suffix: queue-consumer lives in
+`queue-consumer` on every cluster. Telemetry tells environments apart by
+`deployment.environment.name`, which the otel-agent stamps. A per-env
+namespace (`queue-consumer-prod`) only makes sense when several
+environments share a cluster.
+
+Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
 (`manifests/<cluster>/`), sized per environment.
 
 ## Argo CD (`argocd/`)
 
-| File                       | What                                                     |
-| -------------------------- | -------------------------------------------------------- |
-| `helmchart.yaml`           | Argo CD itself, installed by k3s                         |
-| `root-app.yaml`            | App of apps: syncs everything else in `argocd/`          |
-| `clusters-appset.yaml`     | `manifests/<cluster>/` per cluster                       |
-| `keda-appset.yaml`         | KEDA operator per workload cluster                       |
-| `core-workers-appset.yaml` | Every stage × worker1/worker2 (6 Applications)           |
-| `pulse-api-appset.yaml`    | One per stage; the pipeline commits each stage's digest  |
-| `projects/`                | AppProjects: workloads can only touch their own namespace |
+| File                          | What                                                     |
+| ----------------------------- | -------------------------------------------------------- |
+| `helmchart.yaml`              | Argo CD itself, installed by k3s                         |
+| `root-app.yaml`               | App of apps: syncs everything else in `argocd/`          |
+| `clusters-appset.yaml`        | `manifests/<cluster>/` per cluster                       |
+| `otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
+| `otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
+| `signoz.yaml`                 | SigNoz on management                                     |
+| `queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
+| `projects/`                   | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
 
-## core-workers
+## queue-consumer
 
-Two identical workers (`apps/core-workers`, deployed twice with a name
-suffix). KEDA scales them on `core-workers-queue` depth, and they go to zero
-when the queue is empty:
+[queue-consumer](https://github.com/glexposito/queue-consumer) is a Rust
+background worker instrumented with the OpenTelemetry SDK. Each fake message
+it processes is one consumer trace plus a `messages.processed` counter, and
+it logs to stdout.
 
-| Stage    | 1 replica per | Max |
-| -------- | ------------- | --- |
-| internal | 50 messages   | 5   |
-| stg      | 25 messages   | 10  |
-| prod     | 10 messages   | 20  |
+| Stage    | Replicas | Overlay                                |
+| -------- | -------- | -------------------------------------- |
+| internal | 1        | `apps/queue-consumer/overlays/internal` |
+| stg      | 2        | `apps/queue-consumer/overlays/stg`      |
+| prod     | 3        | `apps/queue-consumer/overlays/prod`     |
 
-```bash
-./scripts/queue-messages.sh add 100   # also: remove <n>, count, --help
-```
-
-## pulse-api
-
-A Rust API (`apps/pulse-api`, 1/2/3 replicas). Its pipeline builds the image,
-then for each stage it pins the digest, runs `argocd app sync`, and runs e2e
-before moving on. See [ci-setup.md](ci-setup.md).
+The base sets only standard `OTEL_*` env vars, identical on every stage. It
+sends to the node-local otel-agent, which adds the environment. The image is
+built and pushed to `ghcr.io/glexposito/queue-consumer` by that repo's
+`publish` workflow. Each overlay pins it under `images:`.
