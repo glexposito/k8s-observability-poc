@@ -1,0 +1,13 @@
+# Shared by every stage. overlays/<stage> only sets the replica count and
+# pins the image that stage runs.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/name: queue-consumer
+    includeSelectors: true
+  - pairs:
+      app.kubernetes.io/component: worker
+      app.kubernetes.io/managed-by: kustomize

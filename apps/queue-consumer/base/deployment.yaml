@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: queue-consumer
+spec:
+  # Fallback only - every overlay sets its own count (replicas:).
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    spec:
+      # The app drains in-flight work within 8s of SIGTERM, well inside this.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: queue-consumer
+          # No tag here - every overlay pins its own image (images:).
+          image: ghcr.io/glexposito/queue-consumer
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: RUST_LOG
+              value: info
+            # Plain-text console logs: the otel-agent ships them from
+            # /var/log/pods, and ANSI color codes would end up in the backends.
+            - name: NO_COLOR
+              value: "1"
+            # Standard OpenTelemetry SDK configuration only, identical on every
+            # stage. Telemetry goes to the otel-agent on this node (hostPort
+            # 4318). The agent stamps deployment.environment.name and
+            # k8s.cluster.name, and k8sattributes adds pod/namespace/deployment.
+            # k8s.pod.uid lets k8sattributes match this pod reliably, even if
+            # the hostPort hop hides the pod IP.
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: http://$(NODE_IP):4318
+            - name: OTEL_SERVICE_NAME
+              value: queue-consumer
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: k8s.pod.uid=$(POD_UID),service.namespace=queue-consumer
+            # Cumulative is the app's default and what Prometheus (LGTM)
+            # needs. Spelled out so nobody copies New Relic's delta here.
+            - name: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+              value: cumulative
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          # distroless/cc nonroot image, no shell, writes nothing to disk.
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # No probes: it's a worker with no HTTP port. A dead worker exits
+          # the process (fail fast) and the kubelet restarts it.

@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+replicas:
+  - name: queue-consumer
+    count: 3
+# Pin a digest once CI has published one:
+#   kustomize edit set image ghcr.io/glexposito/queue-consumer@sha256:<digest>
+images:
+  - name: ghcr.io/glexposito/queue-consumer
+    newTag: latest

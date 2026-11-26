@@ -1,10 +1,11 @@
-# stg is customer-facing - a canary gate ahead of prod - kept on its own
-# cluster for isolation even though it's a lighter tier than prod (see
-# README "Namespace design rationale").
+# Workload namespaces on stg. Each cluster is one environment, so names carry
+# no stage suffix: queue-consumer is "queue-consumer" on every cluster, and
+# deployment.environment.name (stamped by the otel-agent) tells the
+# environments apart in telemetry. See docs/architecture.md.
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: core-workers
+  name: queue-consumer
   labels:
     environment: stg
     stage: stg

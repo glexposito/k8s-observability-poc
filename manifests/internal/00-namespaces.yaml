@@ -1,13 +1,11 @@
-# internal is the lowest-risk cluster: safe to break, catches issues
-# before anything reaches a customer-facing environment (see README
-# "Namespace design rationale"). One namespace per cluster now - there's
-# a single workload (core-workers), so the pillar axis this repo used to
-# have is gone; environment is the only boundary left that needs its own
-# quota/RBAC.
+# Workload namespaces on internal. Each cluster is one environment, so names carry
+# no stage suffix: queue-consumer is "queue-consumer" on every cluster, and
+# deployment.environment.name (stamped by the otel-agent) tells the
+# environments apart in telemetry. See docs/architecture.md.
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: core-workers
+  name: queue-consumer
   labels:
     environment: internal
     stage: internal
