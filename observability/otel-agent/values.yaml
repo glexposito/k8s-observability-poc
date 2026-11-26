@@ -77,11 +77,34 @@ config:
       retry_on_failure:
         enabled: true
 
+  connectors:
+    # Standard RED metrics from spans (traces.span.metrics.calls / .duration),
+    # so SigNoz and LGTM chart the exact same series, split by environment
+    # (Tempo's own span metrics only carry service, operation and status).
+    # Generated here rather than in the gateway: a pod's spans always reach its
+    # own node's agent, so every series has exactly one producer. Behind the
+    # gateway's 2 replicas, the same series could come from both and clash.
+    span_metrics:
+      namespace: traces.span.metrics
+      metrics_flush_interval: 15s
+      histogram:
+        unit: ms
+        explicit:
+          # Down to 0.1 ms: queue-consumer's fake work takes microseconds, and
+          # the default buckets start at 2 ms.
+          buckets: [0.1ms, 0.25ms, 0.5ms, 1ms, 2.5ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s]
+
   service:
     pipelines:
       traces:
         receivers: [otlp]
         processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway, span_metrics]
+      # Span metrics inherit the spans' already-enriched resource attributes
+      # (k8s.*, environment), so they only need batching.
+      metrics/span_metrics:
+        receivers: [span_metrics]
+        processors: [memory_limiter, batch]
         exporters: [otlp/gateway]
       metrics:
         receivers: [otlp]
