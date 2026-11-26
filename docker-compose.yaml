@@ -155,7 +155,9 @@ services:
   # Its OTLP ports are deliberately not published, because the host's
   # 4317/4318 belong to the gateway. Grafana: http://localhost:3000 (admin/admin).
   lgtm:
-    image: docker.io/grafana/otel-lgtm:latest
+    # Pinned so a re-pull never changes Grafana, Loki, Tempo or Prometheus
+    # underneath the dashboards. Bump deliberately.
+    image: docker.io/grafana/otel-lgtm:0.41.1
     container_name: lgtm
     hostname: lgtm
 
