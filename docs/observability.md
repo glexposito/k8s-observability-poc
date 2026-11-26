@@ -87,17 +87,19 @@ each backend. Same panels, same `environment` variable:
 | Backend | Files | How it loads |
 | --- | --- | --- |
 | Grafana | `dashboards/grafana/` | Bind-mounted into the `lgtm` container as a provisioning provider. Rescanned every 30 s, so a JSON edit shows up with no restart. |
-| SigNoz | `dashboards/signoz/` | SigNoz has no file provisioning. The `signoz-dashboards` Argo CD app turns the JSON into a ConfigMap, and a PostSync Job imports it through the v2 API as the config-defined admin (`signoz_user_root_*` in `observability/signoz/values.yaml`). Re-runs on every git change. |
+| SigNoz | `dashboards/signoz/` | **Imported by hand** (Dashboards → New dashboard → Import JSON). SigNoz has no file provisioning: its built-in dashboards are compiled into the binary, and everything else goes through its API. Steps in `dashboards/signoz/README.md`. |
 
-Both are **read-only in the UI** (Grafana `allowUiUpdates: false`, SigNoz
-dashboards locked by the import). To change one, edit the JSON and commit.
+Git is the source of truth for both. Grafana enforces it (`allowUiUpdates:
+false`); for SigNoz, export the JSON after editing in the UI and commit it.
 The two use different query languages over the same data: PromQL/LogQL/TraceQL
 in Grafana, where Prometheus rewrites names (`messages.processed` →
 `messages_processed_total`), and SigNoz's query builder, which keeps the
 OpenTelemetry names.
 
-The SigNoz admin only exists on a fresh SigNoz database. If SigNoz was set up
-through its sign-up page first, reset with `docker compose down -v`.
+SigNoz's admin (`admin@playground.local`, from `signoz_user_root_*` in
+`observability/signoz/values.yaml`) only exists on a fresh SigNoz database. If
+SigNoz was set up through its sign-up page first, reset with
+`docker compose down -v`.
 
 **Footprint:** SigNoz (ClickHouse + ZooKeeper) plus LGTM add several GiB on
 top of the four k3s nodes. Give Docker 12-16 GiB.

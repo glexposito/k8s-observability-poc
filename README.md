@@ -62,8 +62,10 @@ cluster. The cluster is the environment boundary, and telemetry carries it as
 queue-consumer emits a trace and a `messages.processed` count every 5 seconds
 per replica, so prod should show about 3x internal's rate.
 
-- **Dashboard "queue-consumer overview"**: in both SigNoz (Dashboards) and Grafana
-  (Dashboards → k8s-observability-poc). Same panels, loaded from git
+- **Dashboard "queue-consumer overview"**: Grafana loads it from git
+  (Dashboards → k8s-observability-poc). For SigNoz, import
+  `observability/dashboards/signoz/queue-consumer-overview.json` once per fresh
+  stack (Dashboards → New dashboard → Import JSON)
 - **SigNoz → Services → `queue-consumer`**: switch environments, compare throughput
 - **Grafana → Explore → Tempo**: service `queue-consumer`, span `do_work`
 - **Grafana → Explore → Prometheus**: `rate(messages_processed_total[1m])` (resource attributes like the environment sit on `target_info`)
