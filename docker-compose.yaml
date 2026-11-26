@@ -164,6 +164,9 @@ services:
 
     volumes:
       - lgtm-data:/data
+      # Dashboards from git (observability/dashboards/grafana/).
+      - ./observability/dashboards/grafana/provisioning.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/k8s-observability-poc.yaml:ro
+      - ./observability/dashboards/grafana/dashboards:/otel-lgtm/dashboards/k8s-observability-poc:ro
 
     networks:
       k8s-management:
