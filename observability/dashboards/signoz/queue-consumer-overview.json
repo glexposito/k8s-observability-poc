@@ -1,12 +1,6 @@
 {
   "name": "queue-consumer-overview",
   "schemaVersion": "v6",
-  "tags": [
-    {
-      "key": "source",
-      "value": "k8s-observability-poc"
-    }
-  ],
   "spec": {
     "display": {
       "name": "queue-consumer overview",
