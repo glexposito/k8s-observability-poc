@@ -18,6 +18,17 @@ spec:
   failurePolicy: abort
   valuesContent: |-
     fullnameOverride: argocd
+    # The chart sets no resources on the repo-server, so it inherited the
+    # argocd namespace's LimitRange default (256Mi) and was OOMKilled while
+    # rendering big charts like SigNoz's. Every Helm-based app depends on it.
+    repoServer:
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
     controller:
       resources:
         requests:
