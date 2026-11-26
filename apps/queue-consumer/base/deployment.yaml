@@ -57,7 +57,8 @@ spec:
             limits:
               cpu: 100m
               memory: 64Mi
-          # distroless/cc nonroot image, no shell, writes nothing to disk.
+          # Static binary on distroless/static nonroot: no libc, no shell,
+          # writes nothing to disk.
           securityContext:
             runAsNonRoot: true
             readOnlyRootFilesystem: true
