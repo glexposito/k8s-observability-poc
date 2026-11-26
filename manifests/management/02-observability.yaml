@@ -1,0 +1,78 @@
+# management now also runs observability: the OpenTelemetry gateway
+# (argocd/otel-gateway.yaml), which every workload cluster's collectors send
+# to, and SigNoz (argocd/signoz.yaml), one of the backends the gateway fans
+# out to. LGTM, the other backend, is a Compose service (docker-compose.yaml).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    environment: management
+    stage: management
+    cost-center: cc-1000
+    managed-by: k8s-observability-poc
+---
+# SigNoz gets no ResourceQuota/LimitRange: ClickHouse, ZooKeeper and the
+# operator bring their own sizing, and ClickHouse is the heavy part
+# (budget roughly 3-4 GiB for this namespace). It also gets no NetworkPolicy:
+# the gateway in `observability` has to reach signoz-otel-collector:4317,
+# and the UI is published through NodePort 30301.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: signoz
+  labels:
+    environment: management
+    stage: management
+    cost-center: cc-1000
+    managed-by: k8s-observability-poc
+---
+# Gateway: 2 replicas (up to 500m / 512Mi each) + 1 surge pod during a rollout.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-quota
+  namespace: observability
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "6"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: observability
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 25m
+        memory: 64Mi
+---
+# The gateway receives OTLP from other clusters through NodePort 30317/30318.
+# kube-proxy masquerades that traffic, so peer IPs can't be pinned reliably.
+# Open the OTLP ports to all sources; everything else stays same-namespace only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace-and-otlp
+  namespace: observability
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP

@@ -13,8 +13,6 @@ services:
 
     ports:
       - "6444:6443"
-      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
-      - "8081:30080"
 
     volumes:
       - internal-data:/var/lib/rancher/k3s
@@ -23,10 +21,9 @@ services:
 
     networks:
       k8s-management:
-        # Fixed, not Docker-assigned - lets manifests/prod/05-cluster-dns.yaml
-        # be static, git-committed YAML instead of something
-        # argocd-bootstrap has to discover at runtime, same reasoning as
-        # azurite's fixed IP below.
+        # Fixed, not Docker-assigned, so management's CoreDNS override
+        # (manifests/management/05-cluster-dns.yaml) can be static,
+        # git-committed YAML. See docs/network.md.
         ipv4_address: 172.28.0.101
 
     healthcheck:
@@ -50,8 +47,6 @@ services:
 
     ports:
       - "6446:6443"
-      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
-      - "8082:30080"
 
     volumes:
       - stg-data:/var/lib/rancher/k3s
@@ -83,8 +78,6 @@ services:
 
     ports:
       - "6445:6443"
-      # pulse-api's NodePort (apps/pulse-api/base/service.yaml)
-      - "8083:30080"
 
     volumes:
       - prod-data:/var/lib/rancher/k3s
@@ -106,12 +99,11 @@ services:
       retries: 60
       start_period: 10s
 
-  # Dedicated platform cluster: runs only Argo CD, no workload namespaces.
-  # Keeps the GitOps control plane's fate independent of any one workload
-  # cluster - rebuilding/losing prod no longer means losing the thing
-  # that manages internal/stg/prod. prod, internal, and stg are all
-  # equally "remote" clusters to Argo CD now - no more special-casing one
-  # of them as "wherever Argo CD happens to run".
+  # Dedicated platform cluster: Argo CD plus the observability stack
+  # (otel-gateway, SigNoz), no workload namespaces. The control plane
+  # and the telemetry pipeline don't share fate with any workload cluster:
+  # losing prod doesn't take down the thing that manages it or the place
+  # its telemetry goes.
   management:
     image: docker.io/rancher/k3s:v1.36.2-k3s1
     container_name: k3s-management
@@ -129,6 +121,12 @@ services:
       # Argo CD UI - argocd/helmchart.yaml sets server.service.type=NodePort
       # on 30090, so this is reachable directly, no kubectl port-forward.
       - "9000:30090"
+      # SigNoz UI (observability/signoz/values.yaml, NodePort 30301).
+      - "8080:30301"
+      # OTel gateway OTLP gRPC/HTTP (observability/otel-gateway/values.yaml),
+      # so you can also send telemetry from the host straight to the gateway.
+      - "4317:30317"
+      - "4318:30318"
 
     volumes:
       - management-data:/var/lib/rancher/k3s
@@ -147,34 +145,28 @@ services:
       retries: 60
       start_period: 10s
 
-  # Local Azure Storage Queue emulator - there's no real Azure account
-  # here, Azurite is Microsoft's official emulator and speaks the same
-  # Queue Storage API. Queue-only (azurite-queue), since blob/table aren't
-  # used by this repo.
-  azurite:
-    image: mcr.microsoft.com/azure-storage/azurite:latest
-    container_name: azurite
-    hostname: azurite
-
-    command:
-      - azurite-queue
-      - --queueHost=0.0.0.0
-      - --queuePort=10001
-      - --location=/data
+  # Grafana's all-in-one LGTM image (Loki, Grafana, Tempo, Mimir-compatible
+  # Prometheus, plus an OTLP collector): the second backend the otel-gateway fans
+  # out to, next to SigNoz. It's a Compose service rather than an in-cluster
+  # install so its several GiB don't land on management next to ClickHouse.
+  # The gateway reaches it at http://lgtm:4318 through a fixed IP and
+  # management's CoreDNS override (manifests/management/05-cluster-dns.yaml).
+  # Its OTLP ports are deliberately not published, because the host's
+  # 4317/4318 belong to the gateway. Grafana: http://localhost:3000 (admin/admin).
+  lgtm:
+    image: docker.io/grafana/otel-lgtm:latest
+    container_name: lgtm
+    hostname: lgtm
 
     ports:
-      - "10001:10001"
+      - "3000:3000"
 
     volumes:
-      - azurite-data:/data
+      - lgtm-data:/data
 
     networks:
       k8s-management:
-        # Fixed, not Docker-assigned - this is what lets every cluster's
-        # CoreDNS override for "azurite" (manifests/<cluster>/05-azurite-dns.yaml)
-        # be a static, git-committed value instead of something a
-        # bootstrap script has to discover at runtime via `docker inspect`.
-        ipv4_address: 172.28.0.100
+        ipv4_address: 172.28.0.105
 
   # One-shot: registers internal/stg/prod with Argo CD (running on
   # management) and applies the root Application, once all four clusters
@@ -249,78 +241,6 @@ services:
     networks:
       - k8s-management
 
-  # One-shot: creates core-workers-queue and seeds it with 100 messages,
-  # so there's something for a future KEDA ScaledObject to scale on. Only
-  # seeds on first creation (checks the `created` field from `queue
-  # create`) - azurite-data persists across `docker compose up -d`
-  # restarts, so without that check this would keep appending 100 more
-  # messages every time the stack comes back up.
-  queue-seed:
-    image: mcr.microsoft.com/azure-cli:latest
-    container_name: queue-seed
-    depends_on:
-      - azurite
-
-    environment:
-      # Azurite's fixed, publicly-documented local development account -
-      # identical on every Azurite install everywhere, not a real secret.
-      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;QueueEndpoint=http://azurite:10001/devstoreaccount1;"
-
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        echo "Waiting for azurite..."
-        until az storage queue exists --name core-workers-queue -o none 2>/dev/null; do sleep 1; done
-        CREATED=$$(az storage queue create --name core-workers-queue --query created -o tsv)
-        if [ "$$CREATED" = "true" ]; then
-          echo "Seeding 100 messages into core-workers-queue..."
-          for i in $$(seq 1 100); do
-            az storage message put --queue-name core-workers-queue --content "message-$$i" -o none
-          done
-          echo "Done."
-        else
-          echo "core-workers-queue already exists - skipping seed."
-        fi
-
-    networks:
-      - k8s-management
-
-  # Self-hosted GitHub Actions runner. It only dials OUT to GitHub
-  # (long-polls for jobs), so GitHub never has to reach this machine - but
-  # jobs run here, on k8s-management, so they can hit Argo CD
-  # (k3s-management:30090) and the workload clusters by hostname, same as
-  # argocd-bootstrap does. Registers once with a one-hour RUNNER_TOKEN from
-  # a gitignored .env (copy .env.example) and keeps its runner credentials
-  # in the github-runner-state volume, so no long-lived token is stored.
-  # Unregistered and no token: it just logs that and exits, so
-  # `docker compose up -d` works anywhere.
-  # Never point this at a public repo: fork PRs would run code here.
-  # runner/Dockerfile: GitHub's official runner image + the argocd and
-  # kustomize CLIs the deploy jobs use; runner/entrypoint.sh registers it.
-  github-runner:
-    build: ./runner
-    image: k8s-observability-poc/github-runner
-    container_name: github-runner
-    restart: on-failure
-
-    environment:
-      RUNNER_REPO: ${RUNNER_REPO:-}
-      RUNNER_TOKEN: ${RUNNER_TOKEN:-}
-      RUNNER_NAME: local-k8s-observability-poc
-      RUNNER_LABELS: local-k8s
-      # Inherited by every job, so workflows never carry Argo CD details.
-      # Same PoC-only fixed login as argocd/helmchart.yaml; 30090 is its
-      # HTTPS NodePort, reached directly over k8s-management.
-      ARGOCD_SERVER: k3s-management:30090
-      ARGOCD_PASSWORD: "123"
-
-    volumes:
-      - github-runner-state:/runner-state
-
-    networks:
-      - k8s-management
-
 volumes:
   internal-data:
   stg-data:
@@ -330,16 +250,15 @@ volumes:
   stg-kubeconfig:
   prod-kubeconfig:
   management-kubeconfig:
-  azurite-data:
-  github-runner-state:
+  lgtm-data:
 
 networks:
   k8s-management:
     driver: bridge
-    # A defined subnet is required to assign azurite a static IP above -
-    # Docker won't let you pin an address on a network with no IPAM
-    # config. Every other container on this network still gets a
-    # Docker-assigned address as before.
+    # A defined subnet is required to pin the static IPs above: Docker
+    # won't let you pin an address on a network with no IPAM config.
+    # Containers without an ipv4_address still get a Docker-assigned one.
+    # Address plan: docs/network.md.
     ipam:
       config:
         - subnet: 172.28.0.0/24

@@ -1,0 +1,65 @@
+# The OpenTelemetry collection layer on stg: the otel-agent DaemonSet and
+# the otel-k8s-state collector (argocd/otel-collectors-appset.yaml). Both forward
+# to the gateway on management. Same governance shape as the workload
+# namespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    environment: stg
+    stage: stg
+    cost-center: cc-1000
+    managed-by: k8s-observability-poc
+---
+# One agent per node (single node here) + otel-k8s-state, with room for
+# a rolling update of each.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-quota
+  namespace: observability
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 1Gi
+    limits.cpu: "1"
+    limits.memory: 2Gi
+    pods: "6"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: observability
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 200m
+        memory: 256Mi
+      defaultRequest:
+        cpu: 25m
+        memory: 64Mi
+---
+# Apps in every namespace push OTLP to the agent on their node
+# (hostPort 4317/4318, OTEL_EXPORTER_OTLP_ENDPOINT=http://$(NODE_IP):4318),
+# so those two ports are open to all sources. Everything else stays
+# same-namespace only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace-and-otlp
+  namespace: observability
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP

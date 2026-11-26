@@ -1,0 +1,93 @@
+# Node agent: one per node on internal/stg/prod (argocd/otel-collectors-appset.yaml).
+# Upstream opentelemetry-collector chart and the official k8s distribution,
+# nothing vendor-specific. It collects what can only be collected locally:
+#   - OTLP from apps on this node (hostPort 4317/4318, OTEL_EXPORTER_OTLP_ENDPOINT
+#     points at status.hostIP)
+#   - kubelet stats (node/pod/container CPU, memory, network, fs)
+#   - pod logs (/var/log/pods)
+# Then it tags everything with k8s.* attributes plus this cluster's identity and
+# forwards OTLP to the gateway on management. Backends are the gateway's
+# concern only.
+#
+# CLUSTER_NAME comes from the ApplicationSet (helm.valuesObject.extraEnvs).
+fullnameOverride: otel-agent
+mode: daemonset
+
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+presets:
+  kubernetesAttributes:
+    enabled: true
+  kubeletMetrics:
+    enabled: true
+  logsCollection:
+    enabled: true
+
+# OTLP only - no legacy Jaeger/Zipkin listeners.
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+    kubelet_stats:
+      # k3s kubelet serving certs aren't verifiable from the SA CA bundle. PoC only.
+      insecure_skip_verify: true
+
+  processors:
+    # Semantic-convention resource attributes. The environment filter in every
+    # backend relies on these.
+    resource/cluster:
+      attributes:
+        - key: k8s.cluster.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+        - key: deployment.environment.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+
+  exporters:
+    otlp/gateway:
+      # NodePort of the gateway Service on management. Resolved by the CoreDNS
+      # override in manifests/<cluster>/05-cluster-dns.yaml.
+      endpoint: k3s-management:30317
+      tls:
+        insecure: true
+      sending_queue:
+        enabled: true
+        queue_size: 2000
+      retry_on_failure:
+        enabled: true
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]

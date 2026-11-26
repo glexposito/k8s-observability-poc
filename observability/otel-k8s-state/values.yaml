@@ -1,0 +1,85 @@
+# Kubernetes state collector: one replica per workload cluster (argocd/otel-collectors-appset.yaml).
+# Collects cluster-wide data, which has to happen exactly once per cluster
+# (a DaemonSet would duplicate it on every node):
+#   - k8s_cluster: deployment/pod/node state, replicas, restarts, phases
+#   - Kubernetes events, as logs
+# Same identity tagging and same gateway export as the node agent.
+fullnameOverride: otel-k8s-state
+mode: deployment
+replicaCount: 1
+
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+presets:
+  clusterMetrics:
+    enabled: true
+  kubernetesEvents:
+    enabled: true
+
+# Nothing pushes to this collector, so it has no listeners and no Service.
+service:
+  enabled: false
+
+ports:
+  otlp:
+    enabled: false
+  otlp-http:
+    enabled: false
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+config:
+  receivers:
+    otlp: null
+    jaeger: null
+    zipkin: null
+    prometheus: null
+
+  processors:
+    resource/cluster:
+      attributes:
+        - key: k8s.cluster.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+        - key: deployment.environment.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+
+  exporters:
+    otlp/gateway:
+      endpoint: k3s-management:30317
+      tls:
+        insecure: true
+      sending_queue:
+        enabled: true
+        queue_size: 2000
+      retry_on_failure:
+        enabled: true
+
+  service:
+    pipelines:
+      # Receivers come from the presets (k8s_cluster, k8sobjects).
+      traces: null
+      metrics:
+        receivers: []
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]
+      logs:
+        receivers: []
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]

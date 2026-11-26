@@ -1,0 +1,14 @@
+# SigNoz on management (argocd/signoz.yaml): one OTLP backend fed by the
+# gateway. Its bundled signoz-otel-collector is only SigNoz's ingestion
+# endpoint (it writes to ClickHouse). It is not our gateway, so LGTM never
+# depends on SigNoz being healthy.
+#
+# Chart defaults everywhere else: ClickHouse via the Altinity operator,
+# ZooKeeper, schema migrator, all on k3s's local-path StorageClass.
+clusterName: management
+
+signoz:
+  service:
+    type: NodePort
+    # UI, published on the host as localhost:8080 (docker-compose.yaml).
+    nodePort: 30301
