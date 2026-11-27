@@ -53,7 +53,7 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 | stg        | `127.0.0.1:6446` | queue-consumer (2 replicas), OTel collectors  |
 | prod       | `127.0.0.1:6445` | queue-consumer (3 replicas), OTel collectors  |
 
-One namespace per app (`queue-consumer`, `observability`), the same on every
+One namespace per app (`queue-consumer`, `otel-collectors`), the same on every
 cluster. The cluster is the environment boundary, and telemetry carries it as
 `deployment.environment.name`.
 

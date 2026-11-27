@@ -1,10 +1,11 @@
 # The OpenTelemetry gateway (gitops/argocd/applications/otel-gateway.yaml),
-# which every workload cluster's collectors send to, and which fans out to
-# SigNoz (signoz namespace) and LGTM (a Compose service, local/compose.yaml).
+# which every workload cluster's collectors (namespace otel-collectors there)
+# send to, and which fans out to SigNoz (signoz namespace) and LGTM (a Compose
+# service, local/compose.yaml).
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: observability
+  name: otel-gateway
   labels:
     team: platform
     environment: management

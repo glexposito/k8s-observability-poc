@@ -182,7 +182,7 @@ without explicit sizes still get defaults that fit inside the quota.
 | RoleBinding per tenant namespace            | Argo CD project `queue-consumer` can only deploy there     |
 | NetworkPolicy blocking other namespaces     | `workload/base/queue-consumer/networkpolicy.yaml`          |
 | ResourceQuota per tenant namespace          | `workload/base/queue-consumer/quota.yaml`, pod count per environment in `workload/overlays/` |
-| Platform namespaces kept separate           | `observability`, `argocd`, `signoz`                        |
+| Platform namespaces kept separate           | `otel-collectors`, `otel-gateway`, `argocd`, `signoz`      |
 | Ownership by label, not by namespace        | `team: platform` on those three, `team: team-1` on `queue-consumer` |
 
 The tenant here is **a single workload** (Google's third option), because the
@@ -199,7 +199,7 @@ prod cluster (same layout in internal and stg)
 ├── domain-1        ← domain-1 apps    domain=domain-1
 ├── domain-2        ← domain-2 apps    domain=domain-2
 ├── domain-x        ← domain-x apps    domain=domain-x
-└── observability   ← platform
+└── otel-collectors ← platform
 ```
 
 Each domain namespace gets the starter kit from section 6: access rights for
@@ -344,12 +344,12 @@ its own, with a literal `kind: Namespace` and its real name:
 gitops/platform/governance/
   workload/                        # every workload cluster (internal/stg/prod)
     base/
-      observability/               # platform namespace
+      otel-collectors/             # platform namespace
       queue-consumer/              # tenant namespace
         namespace.yaml  quota.yaml  limitrange.yaml  networkpolicy.yaml
     overlays/<env>/                # environment labels + what really differs
   management/                      # the management cluster
-    argocd/  observability/  signoz/
+    argocd/  otel-gateway/  signoz/
 ```
 
 **Adding a namespace** (for example `domain-1`): copy `queue-consumer/`,

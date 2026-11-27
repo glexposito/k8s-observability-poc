@@ -63,7 +63,7 @@ spec:
           ref: values
       destination:
         server: '{{.server}}'
-        namespace: observability
+        namespace: otel-collectors
       syncPolicy:
         automated:
           prune: true

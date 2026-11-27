@@ -100,8 +100,8 @@ holes only where traffic must come from outside:
 | Namespace        | Cluster(s)          | Extra ingress allowed       | Why                                       |
 | ---------------- | ------------------- | --------------------------- | ----------------------------------------- |
 | `queue-consumer` | internal, stg, prod | none                        | Worker: outbound connections only         |
-| `observability`  | internal, stg, prod | TCP 4317/4318 from anywhere | Apps in every namespace push to the agent |
-| `observability`  | management          | TCP 4317/4318 from anywhere | Collectors from other clusters hit the NodePort. kube-proxy masquerades them, so peers can't be pinned by IP |
+| `otel-collectors` | internal, stg, prod | TCP 4317/4318 from anywhere | Apps in every namespace push to the agent |
+| `otel-gateway`   | management          | TCP 4317/4318 from anywhere | Collectors from other clusters hit the NodePort. kube-proxy masquerades them, so peers can't be pinned by IP |
 | `argocd`         | management          | none                        | UI reached through NodePort 30090         |
 | `signoz`         | management          | no policy                   | Gateway (other namespace) and UI NodePort must reach it |
 

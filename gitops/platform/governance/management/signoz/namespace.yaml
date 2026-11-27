@@ -1,7 +1,7 @@
 # SigNoz gets no ResourceQuota/LimitRange: ClickHouse, ZooKeeper and the
 # operator bring their own sizing, and ClickHouse is the heavy part
 # (budget roughly 3-4 GiB for this namespace). It also gets no NetworkPolicy:
-# the gateway in `observability` has to reach signoz-otel-collector:4317,
+# the gateway in `otel-gateway` has to reach signoz-otel-collector:4317,
 # and the UI is published through NodePort 30301.
 apiVersion: v1
 kind: Namespace

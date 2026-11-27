@@ -1,11 +1,12 @@
-# The gateway receives OTLP from other clusters through NodePort 30317/30318.
-# kube-proxy masquerades that traffic, so peer IPs can't be pinned reliably.
-# Open the OTLP ports to all sources; everything else stays same-namespace only.
+# Apps in every namespace push OTLP to the agent on their node
+# (hostPort 4317/4318, OTEL_EXPORTER_OTLP_ENDPOINT=http://$(NODE_IP):4318),
+# so those two ports are open to all sources. Everything else stays
+# same-namespace only.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-same-namespace-and-otlp
-  namespace: observability
+  namespace: otel-collectors
 spec:
   podSelector: {}
   policyTypes:

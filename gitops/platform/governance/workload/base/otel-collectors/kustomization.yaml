@@ -1,4 +1,4 @@
-# Platform namespace: the OpenTelemetry collection layer.
+# Platform namespace: the OpenTelemetry collectors (agent + k8s-state).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

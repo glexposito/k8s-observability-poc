@@ -27,7 +27,7 @@ spec:
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: observability
+    namespace: otel-gateway
   syncPolicy:
     automated:
       prune: true
