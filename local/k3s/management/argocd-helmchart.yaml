@@ -1,6 +1,19 @@
-# Laptop-only Argo CD installer: k3s's helm-controller applies this HelmChart
-# at startup (local/compose.yaml mounts k3s/management/ into its manifests
-# folder). Outside gitops/ on purpose: Argo CD doesn't sync its own installer.
+# Laptop-only first install of Argo CD: k3s's helm-controller applies this
+# HelmChart at startup (local/compose.yaml mounts k3s/management/ into its
+# manifests folder). On AKS, the cluster provisioning does this instead
+# (e.g. Terraform's helm_release).
+#
+# Bootstrap only. Argo CD then manages itself from git
+# (gitops/argocd/applications/argocd.yaml + gitops/argocd/install/), so this
+# holds just what must already match before that first self-sync:
+#   - the chart version: keep it in step with the Application's
+#     targetRevision (if they drift, Argo CD upgrades itself to the git one).
+#   - fullnameOverride: resource names must match, or the self-sync would
+#     create a second Argo CD next to this one.
+# Everything else (resources, NodePort, login, URL) comes from git.
+#
+# Don't change Argo CD here after bootstrap: k3s re-runs its Helm job when
+# this file changes, which would briefly undo what Argo CD applied from git.
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
@@ -17,41 +30,3 @@ spec:
   failurePolicy: abort
   valuesContent: |-
     fullnameOverride: argocd
-    # The chart sets no resources on the repo-server, so it inherited the
-    # argocd namespace's LimitRange default (256Mi) and was OOMKilled while
-    # rendering big charts like SigNoz's. Every Helm-based app depends on it.
-    repoServer:
-      resources:
-        requests:
-          cpu: 250m
-          memory: 512Mi
-        limits:
-          cpu: "1"
-          memory: 1Gi
-    controller:
-      resources:
-        requests:
-          cpu: 375m
-          memory: 512Mi
-        limits:
-          cpu: 750m
-          memory: 1024Mi
-    # PoC-only: fixed admin/123 login and a NodePort so the UI is reachable
-    # the moment this Helm install finishes - no kubectl port-forward
-    # process, no script, nothing to run by hand. Weak on purpose; this
-    # never leaves 127.0.0.1 (see compose.yaml's management port
-    # mapping).
-    # Hash generated with:
-    #   docker run --rm httpd:2.4-alpine htpasswd -nbBC 10 "" 123 | tr -d ':\n'
-    configs:
-      # Argo CD's external URL - used in CLI output and notification links.
-      # The chart's default (from global.domain) is argocd.example.com.
-      cm:
-        url: https://127.0.0.1:9000
-      secret:
-        argocdServerAdminPassword: "$2a$10$zG/yvDMqlg9VStNvqCftBe3UVYc53FK5Gh47BWpeMuBl4vYQf3ini"
-        argocdServerAdminPasswordMtime: "2024-01-01T00:00:00Z"
-    server:
-      service:
-        type: NodePort
-        nodePortHttps: 30090

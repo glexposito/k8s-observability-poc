@@ -1,0 +1,43 @@
+# Argo CD managing itself: the argo-cd chart with values from
+# gitops/argocd/install/. Something else does the first install, before any
+# Argo CD exists (locally the k3s HelmChart in local/k3s/management/, on AKS
+# the cluster provisioning); from then on, changing Argo CD means changing
+# those files.
+#
+# No resources-finalizer on purpose: deleting this Application must never
+# cascade-delete Argo CD itself.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd
+  namespace: argocd
+  labels:
+    environment: management
+    layer: bootstrap
+spec:
+  project: platform
+  sources:
+    - repoURL: https://argoproj.github.io/argo-helm
+      chart: argo-cd
+      # Keep the bootstrap install's version in step
+      # (local/k3s/management/argocd-helmchart.yaml).
+      targetRevision: 10.20.0 # Argo CD v3.6.3
+      helm:
+        releaseName: argocd
+        valueFiles:
+          - $values/gitops/argocd/install/values.yaml
+          - $values/gitops/argocd/install/values-local.yaml
+    - repoURL: https://github.com/glexposito/k8s-observability-poc.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Argo CD's CRDs are too large for client-side apply's
+      # last-applied-configuration annotation.
+      - ServerSideApply=true

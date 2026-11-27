@@ -118,8 +118,9 @@ services:
 
     ports:
       - "6447:6443"
-      # Argo CD UI - k3s/management/argocd-helmchart.yaml sets server.service.type=NodePort
-      # on 30090, so this is reachable directly, no kubectl port-forward.
+      # Argo CD UI - gitops/argocd/install/values-local.yaml sets
+      # server.service.type=NodePort on 30090, so this is reachable directly,
+      # no kubectl port-forward.
       - "9000:30090"
       # SigNoz UI (gitops/platform/observability/signoz/values-local.yaml, NodePort 30301). 3301 is
       # SigNoz's traditional port and keeps 8080 free for other local tools.

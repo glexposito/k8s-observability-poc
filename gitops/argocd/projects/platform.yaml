@@ -25,6 +25,8 @@ spec:
     # OpenTelemetry Collector chart and SigNoz's chart.
     - https://open-telemetry.github.io/opentelemetry-helm-charts
     - https://charts.signoz.io
+    # Argo CD itself (gitops/argocd/applications/argocd.yaml).
+    - https://argoproj.github.io/argo-helm
   destinations:
     - server: https://kubernetes.default.svc
       namespace: '*'

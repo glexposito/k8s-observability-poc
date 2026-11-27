@@ -23,7 +23,7 @@ local/
   k3s/management/            # applied by k3s on management (incl. the Argo CD installer)
   lgtm/                      # Grafana dashboard provider for the lgtm container
 gitops/
-  argocd/                    # root app, AppProjects, Applications/ApplicationSets
+  argocd/                    # Argo CD's own values, root app, AppProjects, Applications
   platform/governance/       # namespaces, quotas, limits, NetworkPolicies
   platform/observability/    # collector/SigNoz values, dashboards
   apps/                      # tenant workloads (queue-consumer)
@@ -43,7 +43,7 @@ manages it.
    `local/k3s/workload/` on internal/stg/prod (CoreDNS override, Argo CD's
    ServiceAccount and token), `local/k3s/management/` on management
    (CoreDNS override, Argo CD's installer).
-2. k3s installs Argo CD on management from
+2. k3s installs a bare Argo CD on management from
    `local/k3s/management/argocd-helmchart.yaml`.
 3. `argocd-bootstrap` runs `local/register-clusters.sh`: it registers
    internal/stg/prod with Argo CD and applies `gitops/argocd/root-app.yaml`.
@@ -100,8 +100,18 @@ All of it is plain Kustomize, synced by Argo CD only. Check an overlay with
 | `applications/signoz.yaml`                 | SigNoz on management                                     |
 | `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
 
-Argo CD itself is installed by k3s (`local/k3s/management/argocd-helmchart.yaml`),
-not synced by Argo CD.
+| `applications/argocd.yaml`                 | Argo CD itself (self-managed)                            |
+| `install/`                                 | Argo CD's Helm values: `values.yaml` + `values-local.yaml` |
+
+**Argo CD manages itself.** It can't install itself the first time, so k3s
+installs a bare one from `local/k3s/management/argocd-helmchart.yaml`. That
+file holds only what must match before the takeover: the chart version and
+`fullnameOverride`. On its first sync, `applications/argocd.yaml` applies
+everything else from `install/`. From then on, change Argo CD only there (and
+the chart version in both files). On AKS, the bootstrap install belongs to the
+cluster provisioning instead (e.g. Terraform's `helm_release`, ignoring later
+changes). The Application has no resources-finalizer, so deleting it never
+deletes Argo CD.
 
 ## queue-consumer
 

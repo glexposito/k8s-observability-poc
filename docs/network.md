@@ -82,7 +82,7 @@ of this: Docker's DNS already resolves `k3s-<cluster>` for it.
 | From                         | To                                        | Port            | Purpose                                 |
 | ---------------------------- | ----------------------------------------- | --------------- | --------------------------------------- |
 | Argo CD (management)         | `k3s-<cluster>`                           | 6443            | Sync workload clusters (bearer token from `argocd-bootstrap`) |
-| Argo CD repo-server          | GitHub, Helm repos                        | 443 (out)       | This repo, OTel and SigNoz charts       |
+| Argo CD repo-server          | GitHub, Helm repos                        | 443 (out)       | This repo, Argo CD, OTel and SigNoz charts |
 | workload kubelets            | `ghcr.io`                                 | 443 (out)       | Pull `glexposito/queue-consumer`        |
 | `argocd-bootstrap`           | all four API servers                      | 6443            | One-shot cluster registration           |
 | queue-consumer pods          | `otel-agent` on their node (`$(NODE_IP)`) | 4318 (hostPort) | Traces + metrics (OTel SDK)             |

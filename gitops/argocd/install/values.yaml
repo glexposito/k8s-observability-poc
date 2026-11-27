@@ -1,0 +1,26 @@
+# Argo CD's own Helm values (argo-cd chart). Argo CD manages itself from these
+# (applications/argocd.yaml), applying them on its first self-sync after the
+# bootstrap install (locally local/k3s/management/argocd-helmchart.yaml).
+# fullnameOverride must match the bootstrap install.
+# Laptop-only settings (NodePort, fixed login, URL): values-local.yaml.
+fullnameOverride: argocd
+
+# The chart sets no resources on the repo-server, so it inherited the
+# argocd namespace's LimitRange default (256Mi) and was OOMKilled while
+# rendering big charts like SigNoz's. Every Helm-based app depends on it.
+repoServer:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+controller:
+  resources:
+    requests:
+      cpu: 375m
+      memory: 512Mi
+    limits:
+      cpu: 750m
+      memory: 1024Mi
