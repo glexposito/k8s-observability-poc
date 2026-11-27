@@ -29,6 +29,30 @@ gitops/
   apps/                      # tenant workloads (queue-consumer)
 ```
 
+**Why `apps/`, `platform/` and `argocd/`.** It's the split of Flux's
+[repository structure guide](https://fluxcd.io/flux/guides/repository-structure/),
+whose monorepo has `apps`, `infrastructure` and `clusters`, because "the
+separation between apps and infrastructure makes it possible to define the
+order in which a cluster is reconciled":
+
+| Flux | Here | Holds |
+| --- | --- | --- |
+| `apps/` | `gitops/apps/` | What tenants run: services, workers, jobs |
+| `infrastructure/` | `gitops/platform/` | What the platform runs: governance, collectors, gateway, SigNoz |
+| `clusters/` | `gitops/argocd/` | What gets deployed where |
+
+`apps/` covers workers and jobs too, not just services: Kubernetes defines
+"A workload is an application running on Kubernetes"
+([Workloads](https://kubernetes.io/docs/concepts/workloads/)).
+What kind of app it is goes in its labels, not the folder:
+queue-consumer is `app.kubernetes.io/component: worker`; an API would be
+`api`, a batch job `job`.
+
+Two meanings of "application", don't mix them up: `gitops/apps/` holds what
+tenants run, while `gitops/argocd/applications/` holds Argo CD `Application`
+objects, Argo CD's term for "deploy this source to that cluster". Some of
+those deploy apps; most deploy platform components.
+
 ## Clusters and bootstrap
 
 Four single-node k3s clusters in Docker: **management** runs the platform
@@ -183,6 +207,15 @@ built and pushed to `ghcr.io/glexposito/queue-consumer` by that repo's
 `publish` workflow. Each overlay pins it under `images:`.
 
 ## Sources
+
+Repo layout:
+
+- [Flux → Repository structure](https://fluxcd.io/flux/guides/repository-structure/):
+  the monorepo split into `apps`, `infrastructure` and `clusters`.
+- [Kubernetes → Workloads](https://kubernetes.io/docs/concepts/workloads/):
+  "A workload is an application running on Kubernetes" (its glossary
+  definition), made of "DaemonSet, Deployment, Job, ReplicaSet, and
+  StatefulSet" objects.
 
 Argo CD:
 
