@@ -4,7 +4,7 @@ resources:
   - ../../base
 replicas:
   - name: queue-consumer
-    count: 3
+    count: 10
 # Pinned digest, published by queue-consumer's publish workflow (sha-eb29d64).
 # Bump with: kustomize edit set image ghcr.io/glexposito/queue-consumer@sha256:<digest>
 images:
