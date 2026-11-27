@@ -7,6 +7,7 @@ kind: Namespace
 metadata:
   name: observability
   labels:
+    team: platform
     environment: management
     stage: management
     cost-center: cc-1000
@@ -22,6 +23,7 @@ kind: Namespace
 metadata:
   name: signoz
   labels:
+    team: platform
     environment: management
     stage: management
     cost-center: cc-1000

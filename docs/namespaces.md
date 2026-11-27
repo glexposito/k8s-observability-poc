@@ -183,6 +183,7 @@ without explicit sizes still get defaults that fit inside the quota.
 | NetworkPolicy blocking other namespaces     | `manifests/base/queue-consumer-policies.yaml`              |
 | ResourceQuota per tenant namespace          | same file, pod count per cluster in `manifests/overlays/`  |
 | Platform namespaces kept separate           | `observability`, `argocd`, `signoz`                        |
+| Ownership by label, not by namespace        | `team: platform` on those three, `team: team-1` on `queue-consumer` |
 
 The tenant here is **a single workload** (Google's third option), because the
 playground has one app.
