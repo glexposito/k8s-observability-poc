@@ -1,0 +1,9 @@
+# Governance for the management cluster: its namespaces plus their quotas,
+# limits and NetworkPolicies. Not an environment overlay: management is a
+# platform cluster, not a promotion stage.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - policies.yaml
+  - observability.yaml

@@ -71,8 +71,8 @@ hostnames to the fixed IPs above:
 
 | Cluster               | File                                       | Resolves                                                   |
 | --------------------- | ------------------------------------------ | ---------------------------------------------------------- |
-| management            | `manifests/management/05-cluster-dns.yaml` | `k3s-internal`, `k3s-stg`, `k3s-prod` (Argo CD), `lgtm` (gateway) |
-| internal / stg / prod | `manifests/bootstrap/05-cluster-dns.yaml`  | `k3s-management` (OTel collectors → gateway)               |
+| management            | `local/k3s/management/cluster-dns.yaml` | `k3s-internal`, `k3s-stg`, `k3s-prod` (Argo CD), `lgtm` (gateway) |
+| internal / stg / prod | `local/k3s/workload/cluster-dns.yaml`     | `k3s-management` (OTel collectors → gateway)               |
 
 `argocd-bootstrap` runs as a container on the bridge, so it doesn't need any
 of this: Docker's DNS already resolves `k3s-<cluster>` for it.

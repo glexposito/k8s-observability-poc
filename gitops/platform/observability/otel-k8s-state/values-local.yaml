@@ -1,0 +1,11 @@
+# Laptop-only settings for the Kubernetes state collector: how a k3s workload
+# cluster in Docker reaches the gateway.
+# Layered on top of values.yaml (gitops/argocd/applications/otel-collectors-appset.yaml).
+config:
+  exporters:
+    otlp/gateway:
+      # NodePort of the gateway Service on management. Resolved by the CoreDNS
+      # override in local/k3s/workload/cluster-dns.yaml.
+      endpoint: k3s-management:30317
+      tls:
+        insecure: true

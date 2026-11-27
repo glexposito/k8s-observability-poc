@@ -64,7 +64,7 @@ per replica, so prod should show about 3x internal's rate.
 
 - **Dashboard "queue-consumer overview"**: Grafana loads it from git
   (Dashboards → k8s-observability-poc). For SigNoz, import
-  `observability/dashboards/signoz/queue-consumer-overview.json` once per fresh
+  `gitops/platform/observability/dashboards/signoz/queue-consumer-overview.json` once per fresh
   stack (Dashboards → New dashboard → Import JSON)
 - **SigNoz → Services → `queue-consumer`**: switch environments, compare throughput
 - **Grafana → Explore → Tempo**: service `queue-consumer`, span `do_work`
@@ -89,6 +89,16 @@ docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-co
 docker compose down       # keep state
 docker compose down -v    # wipe everything
 ```
+
+## Repo layout
+
+- **`gitops/`: the pattern.** Everything Argo CD syncs: projects and
+  Applications (`argocd/`), governance and observability (`platform/`), and
+  workloads (`apps/`). This is the part to copy.
+- **`local/`: laptop scaffolding.** The k3s clusters in Docker and what they
+  need before Argo CD takes over. A real platform replaces it.
+
+Details in [architecture.md](docs/architecture.md#repo-layout).
 
 ## Docs
 

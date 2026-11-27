@@ -1,0 +1,12 @@
+# Laptop-only settings for the gateway: a NodePort, so collectors in the other
+# k3s clusters (and the host, via local/compose.yaml) can reach it on
+# k3s-management:30317 (gRPC) / 30318 (HTTP).
+# Layered on top of values.yaml (gitops/argocd/applications/otel-gateway.yaml).
+service:
+  type: NodePort
+
+ports:
+  otlp:
+    nodePort: 30317
+  otlp-http:
+    nodePort: 30318

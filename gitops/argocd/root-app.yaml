@@ -1,0 +1,30 @@
+# App-of-apps bootstrap: the one Application applied by hand (by
+# local/register-clusters.sh), pointing at this gitops/argocd/ directory
+# itself. Once this exists, the AppProjects and Applications here (and
+# whatever the ApplicationSets generate) are synced automatically.
+#
+# directory.recurse is required: Argo CD's directory source is
+# non-recursive by default, so without it projects/ and applications/
+# would be silently ignored.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  labels:
+    layer: bootstrap
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/glexposito/k8s-observability-poc.git
+    targetRevision: HEAD
+    path: gitops/argocd
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

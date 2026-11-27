@@ -1,0 +1,8 @@
+# SigNoz on management (gitops/argocd/applications/signoz.yaml): one OTLP backend fed by the
+# gateway. Its bundled signoz-otel-collector is only SigNoz's ingestion
+# endpoint (it writes to ClickHouse). It is not our gateway, so LGTM never
+# depends on SigNoz being healthy.
+#
+# Chart defaults everywhere else: ClickHouse via the Altinity operator,
+# ZooKeeper, schema migrator, all on k3s's local-path StorageClass.
+clusterName: management

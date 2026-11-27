@@ -1,0 +1,234 @@
+services:
+  internal:
+    image: docker.io/rancher/k3s:v1.36.2-k3s1
+    container_name: k3s-internal
+    hostname: k3s-internal
+    privileged: true
+
+    command:
+      - server
+      - --node-name=internal
+      - --tls-san=localhost
+      - --tls-san=k3s-internal
+
+    ports:
+      - "6444:6443"
+
+    volumes:
+      - internal-data:/var/lib/rancher/k3s
+      - internal-kubeconfig:/etc/rancher/k3s
+      - ./k3s/workload:/var/lib/rancher/k3s/server/manifests/custom:ro
+
+    networks:
+      k8s-management:
+        # Fixed, not Docker-assigned, so management's CoreDNS override
+        # (k3s/management/cluster-dns.yaml) can be static,
+        # git-committed YAML. See docs/network.md.
+        ipv4_address: 172.28.0.101
+
+    healthcheck:
+      test: ["CMD-SHELL", "kubectl wait --for=create node --all --timeout=3s && kubectl wait --for=condition=ready node --all --timeout=3s"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  stg:
+    image: docker.io/rancher/k3s:v1.36.2-k3s1
+    container_name: k3s-stg
+    hostname: k3s-stg
+    privileged: true
+
+    command:
+      - server
+      - --node-name=stg
+      - --tls-san=localhost
+      - --tls-san=k3s-stg
+
+    ports:
+      - "6446:6443"
+
+    volumes:
+      - stg-data:/var/lib/rancher/k3s
+      - stg-kubeconfig:/etc/rancher/k3s
+      - ./k3s/workload:/var/lib/rancher/k3s/server/manifests/custom:ro
+
+    networks:
+      k8s-management:
+        ipv4_address: 172.28.0.102
+
+    healthcheck:
+      test: ["CMD-SHELL", "kubectl wait --for=create node --all --timeout=3s && kubectl wait --for=condition=ready node --all --timeout=3s"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  prod:
+    image: docker.io/rancher/k3s:v1.36.2-k3s1
+    container_name: k3s-prod
+    hostname: k3s-prod
+    privileged: true
+
+    command:
+      - server
+      - --node-name=prod
+      - --tls-san=localhost
+      - --tls-san=k3s-prod
+
+    ports:
+      - "6445:6443"
+
+    volumes:
+      - prod-data:/var/lib/rancher/k3s
+      - prod-kubeconfig:/etc/rancher/k3s
+      - ./k3s/workload:/var/lib/rancher/k3s/server/manifests/custom:ro
+
+    networks:
+      k8s-management:
+        # Fixed so k3s/management/cluster-dns.yaml can resolve
+        # k3s-prod as static, git-committed YAML - prod is just another
+        # remote cluster to the management cluster's Argo CD now, same
+        # as internal/stg.
+        ipv4_address: 172.28.0.103
+
+    healthcheck:
+      test: ["CMD-SHELL", "kubectl wait --for=create node --all --timeout=3s && kubectl wait --for=condition=ready node --all --timeout=3s"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  # Dedicated platform cluster: Argo CD plus the observability stack
+  # (otel-gateway, SigNoz), no workload namespaces. The control plane
+  # and the telemetry pipeline don't share fate with any workload cluster:
+  # losing prod doesn't take down the thing that manages it or the place
+  # its telemetry goes.
+  management:
+    image: docker.io/rancher/k3s:v1.36.2-k3s1
+    container_name: k3s-management
+    hostname: k3s-management
+    privileged: true
+
+    command:
+      - server
+      - --node-name=management
+      - --tls-san=localhost
+      - --tls-san=k3s-management
+
+    ports:
+      - "6447:6443"
+      # Argo CD UI - k3s/management/argocd-helmchart.yaml sets server.service.type=NodePort
+      # on 30090, so this is reachable directly, no kubectl port-forward.
+      - "9000:30090"
+      # SigNoz UI (gitops/platform/observability/signoz/values-local.yaml, NodePort 30301). 3301 is
+      # SigNoz's traditional port and keeps 8080 free for other local tools.
+      - "3301:30301"
+      # OTel gateway OTLP gRPC/HTTP (gitops/platform/observability/otel-gateway/values-local.yaml),
+      # so you can also send telemetry from the host straight to the gateway.
+      - "4317:30317"
+      - "4318:30318"
+
+    volumes:
+      - management-data:/var/lib/rancher/k3s
+      - management-kubeconfig:/etc/rancher/k3s
+      # Argo CD's installer (HelmChart) and the CoreDNS override for lgtm.
+      - ./k3s/management:/var/lib/rancher/k3s/server/manifests/custom:ro
+
+    networks:
+      k8s-management:
+        ipv4_address: 172.28.0.104
+
+    healthcheck:
+      test: ["CMD-SHELL", "kubectl wait --for=create node --all --timeout=3s && kubectl wait --for=condition=ready node --all --timeout=3s"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s
+
+  # Grafana's all-in-one LGTM image (Loki, Grafana, Tempo, Mimir-compatible
+  # Prometheus, plus an OTLP collector): the second backend the otel-gateway fans
+  # out to, next to SigNoz. It's a Compose service rather than an in-cluster
+  # install so its several GiB don't land on management next to ClickHouse.
+  # The gateway reaches it at http://lgtm:4318 through a fixed IP and
+  # management's CoreDNS override (k3s/management/cluster-dns.yaml).
+  # Its OTLP ports are deliberately not published, because the host's
+  # 4317/4318 belong to the gateway. Grafana: http://127.0.0.1:3000 (admin/admin).
+  lgtm:
+    # Pinned so a re-pull never changes Grafana, Loki, Tempo or Prometheus
+    # underneath the dashboards. Bump deliberately.
+    image: docker.io/grafana/otel-lgtm:0.41.1
+    container_name: lgtm
+    hostname: lgtm
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - lgtm-data:/data
+      # Dashboards from git (gitops/platform/observability/dashboards/grafana/),
+      # loaded by the provider in lgtm/dashboards-provider.yaml.
+      - ./lgtm/dashboards-provider.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/k8s-observability-poc.yaml:ro
+      - ../gitops/platform/observability/dashboards/grafana:/otel-lgtm/dashboards/k8s-observability-poc:ro
+
+    networks:
+      k8s-management:
+        ipv4_address: 172.28.0.105
+
+  # One-shot: runs register-clusters.sh, which registers internal/stg/prod
+  # with Argo CD (running on management) and applies the root Application,
+  # once all four clusters are up and Argo CD has installed. Reuses the k3s image purely for its
+  # bundled kubectl - no server process runs here. Talks to each cluster
+  # over k8s-management by hostname instead of `docker exec`, using the
+  # kubeconfig each k3s server writes to /etc/rancher/k3s/k3s.yaml (shared
+  # via the *-kubeconfig volumes above); --server overrides the
+  # 127.0.0.1 baked into that file, and TLS still verifies cleanly
+  # against it since --tls-san=k3s-<cluster> above covers exactly that
+  # hostname.
+  argocd-bootstrap:
+    image: docker.io/rancher/k3s:v1.36.2-k3s1
+    container_name: argocd-bootstrap
+    depends_on:
+      internal:
+        condition: service_healthy
+      stg:
+        condition: service_healthy
+      prod:
+        condition: service_healthy
+      management:
+        condition: service_healthy
+
+    volumes:
+      - internal-kubeconfig:/kubeconfigs/internal:ro
+      - stg-kubeconfig:/kubeconfigs/stg:ro
+      - prod-kubeconfig:/kubeconfigs/prod:ro
+      - management-kubeconfig:/kubeconfigs/management:ro
+      - ../gitops/argocd/root-app.yaml:/gitops/root-app.yaml:ro
+      - ./register-clusters.sh:/register-clusters.sh:ro
+
+    entrypoint: ["/bin/sh", "/register-clusters.sh"]
+
+    networks:
+      - k8s-management
+
+volumes:
+  internal-data:
+  stg-data:
+  prod-data:
+  management-data:
+  internal-kubeconfig:
+  stg-kubeconfig:
+  prod-kubeconfig:
+  management-kubeconfig:
+  lgtm-data:
+
+networks:
+  k8s-management:
+    driver: bridge
+    # A defined subnet is required to pin the static IPs above: Docker
+    # won't let you pin an address on a network with no IPAM config.
+    # Containers without an ipv4_address still get a Docker-assigned one.
+    # Address plan: docs/network.md.
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

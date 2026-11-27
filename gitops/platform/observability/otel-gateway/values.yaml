@@ -1,0 +1,79 @@
+# OTel gateway on management (gitops/argocd/applications/otel-gateway.yaml), OpenTelemetry's
+# gateway deployment pattern. It is the only place that knows which backends
+# exist. Every cluster's agents send OTLP here (how they reach it:
+# values-local.yaml), and the gateway fans each signal out to every backend
+# over plain OTLP:
+#   - SigNoz  (signoz namespace, in-cluster)
+#   - LGTM    (grafana/otel-lgtm Compose service, resolved by the CoreDNS
+#              override in local/k3s/management/cluster-dns.yaml)
+# To add, swap or drop a backend, edit only this file.
+#
+# Each exporter has its own sending_queue, so a slow or down backend fills its
+# own queue instead of blocking the other one.
+fullnameOverride: otel-gateway
+mode: deployment
+replicaCount: 2
+
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+ports:
+  otlp:
+    hostPort: null
+  otlp-http:
+    hostPort: null
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+
+  exporters:
+    otlp/signoz:
+      endpoint: signoz-otel-collector.signoz.svc.cluster.local:4317
+      tls:
+        insecure: true
+      sending_queue:
+        enabled: true
+        queue_size: 5000
+      retry_on_failure:
+        enabled: true
+    otlphttp/lgtm:
+      endpoint: http://lgtm:4318
+      sending_queue:
+        enabled: true
+        queue_size: 5000
+      retry_on_failure:
+        enabled: true
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/signoz, otlphttp/lgtm]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/signoz, otlphttp/lgtm]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/signoz, otlphttp/lgtm]

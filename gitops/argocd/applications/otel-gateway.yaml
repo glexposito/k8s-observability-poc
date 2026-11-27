@@ -1,0 +1,36 @@
+# The OTel gateway (OpenTelemetry's gateway deployment pattern): a Collector
+# Deployment (2 replicas) on management. Every workload cluster's collectors
+# (otel-collectors-appset.yaml) send here (locally through a NodePort, see
+# values-local.yaml), and it fans out over OTLP to every backend (SigNoz,
+# LGTM). Values: gitops/platform/observability/otel-gateway/.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: otel-gateway
+  namespace: argocd
+  labels:
+    environment: management
+    layer: observability
+spec:
+  project: platform
+  sources:
+    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      chart: opentelemetry-collector
+      targetRevision: 0.183.2 # collector 0.165.0
+      helm:
+        releaseName: otel-gateway
+        valueFiles:
+          - $values/gitops/platform/observability/otel-gateway/values.yaml
+          - $values/gitops/platform/observability/otel-gateway/values-local.yaml
+    - repoURL: https://github.com/glexposito/k8s-observability-poc.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

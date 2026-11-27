@@ -1,5 +1,34 @@
 # Architecture
 
+## Repo layout
+
+The repo has two halves, and only one of them is the pattern:
+
+| Path      | What                                                                 |
+| --------- | -------------------------------------------------------------------- |
+| `gitops/` | **The pattern.** Everything Argo CD syncs: Argo CD's projects and Applications, platform governance, the observability stack, the apps. |
+| `local/`  | **Laptop scaffolding.** The k3s clusters in Docker, what k3s applies before Argo CD can reach a cluster (CoreDNS overrides, Argo CD's login, Argo CD's installer), and cluster registration. A real platform replaces all of it with its own provisioning. |
+
+Nothing in `gitops/` refers to files in `local/`. The few settings that only
+exist because the clusters run in Docker (NodePorts, the `k3s-management`
+endpoint, k3s's kubelet certificates, fixed logins) live in a
+`values-local.yaml` next to each chart's `values.yaml`.
+
+```
+docker-compose.yaml          # entry point: includes local/compose.yaml
+local/
+  compose.yaml               # 4× k3s, lgtm, argocd-bootstrap
+  register-clusters.sh       # registers internal/stg/prod with Argo CD, applies the root app
+  k3s/workload/              # applied by k3s on internal/stg/prod
+  k3s/management/            # applied by k3s on management (incl. the Argo CD installer)
+  lgtm/                      # Grafana dashboard provider for the lgtm container
+gitops/
+  argocd/                    # root app, AppProjects, Applications/ApplicationSets
+  platform/governance/       # namespaces, quotas, limits, NetworkPolicies
+  platform/observability/    # collector/SigNoz values, dashboards
+  apps/                      # tenant workloads (queue-consumer)
+```
+
 ## Clusters and bootstrap
 
 Four single-node k3s clusters in Docker: **management** runs the platform
@@ -8,14 +37,20 @@ Four single-node k3s clusters in Docker: **management** runs the platform
 cluster means losing a workload cluster never takes down the thing that
 manages it.
 
-`docker compose up -d` does everything, with no scripts:
+`docker compose up -d` does everything, with nothing to run by hand:
 
-1. Each k3s container auto-applies its bootstrap manifests, which are
-   bind-mounted in: `manifests/bootstrap/` on internal/stg/prod (shared),
-   `manifests/management/` on management.
-2. k3s installs Argo CD on management from `argocd/helmchart.yaml`.
-3. `argocd-bootstrap` registers internal/stg/prod with Argo CD and applies
-   `argocd/root-app.yaml`. From then on, Argo CD manages everything from git.
+1. Each k3s container auto-applies its bind-mounted folder:
+   `local/k3s/workload/` on internal/stg/prod (CoreDNS override, Argo CD's
+   ServiceAccount and token), `local/k3s/management/` on management
+   (CoreDNS override, Argo CD's installer).
+2. k3s installs Argo CD on management from
+   `local/k3s/management/argocd-helmchart.yaml`.
+3. `argocd-bootstrap` runs `local/register-clusters.sh`: it registers
+   internal/stg/prod with Argo CD and applies `gitops/argocd/root-app.yaml`.
+   From then on, Argo CD manages everything under `gitops/` from git.
+
+Each file is applied by exactly one of the two: k3s applies `local/k3s/`,
+Argo CD applies `gitops/`.
 
 For IPs, ports, DNS and traffic flows, see [network.md](network.md).
 
@@ -42,32 +77,31 @@ this, see [namespaces.md](namespaces.md).
 Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy,
 sized per environment.
 
-### Governance manifests (`manifests/`)
+### Governance (`gitops/platform/governance/`)
 
-| Path                    | Applied by                  | What                                             |
-| ----------------------- | --------------------------- | ------------------------------------------------ |
-| `bootstrap/`            | k3s at startup + Argo CD    | Namespaces, CoreDNS override, Argo CD's ServiceAccount. Shared by internal/stg/prod |
-| `base/`                 | Argo CD (Kustomize)         | `bootstrap/` + quotas, limits and NetworkPolicies |
-| `overlays/<cluster>/`   | Argo CD (Kustomize)         | Only what differs: `environment`/`stage` labels and the queue-consumer pod quota |
-| `management/`           | k3s at startup + Argo CD    | Plain YAML, management is genuinely different    |
+| Path                      | What                                                       |
+| ------------------------- | ---------------------------------------------------------- |
+| `workload/base/`          | Namespaces + their quotas, limits and NetworkPolicies, shared by internal/stg/prod |
+| `workload/overlays/<env>/`| Only what differs: `environment`/`stage` labels and the queue-consumer pod quota |
+| `management/`             | management's own namespaces and guardrails                 |
 
-`bootstrap/` stays plain YAML because k3s applies it before Argo CD can reach
-the cluster, and k3s doesn't run Kustomize. Argo CD syncs it too (through
-`base/`), so `prune: true` never deletes it. Check an overlay with
-`kubectl kustomize manifests/overlays/<cluster>`.
+All of it is plain Kustomize, synced by Argo CD only. Check an overlay with
+`kubectl kustomize gitops/platform/governance/workload/overlays/<env>`.
 
-## Argo CD (`argocd/`)
+## Argo CD (`gitops/argocd/`)
 
-| File                          | What                                                     |
-| ----------------------------- | -------------------------------------------------------- |
-| `helmchart.yaml`              | Argo CD itself, installed by k3s                         |
-| `root-app.yaml`               | App of apps: syncs everything else in `argocd/`          |
-| `clusters-appset.yaml`        | `manifests/overlays/<cluster>` (or `manifests/management`) per cluster |
-| `otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
-| `otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
-| `signoz.yaml`                 | SigNoz on management                                     |
-| `queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
-| `projects/`                   | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
+| File                                       | What                                                     |
+| ------------------------------------------ | -------------------------------------------------------- |
+| `root-app.yaml`                            | App of apps: syncs everything else in `gitops/argocd/`   |
+| `projects/`                                | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
+| `applications/governance-appset.yaml`      | `platform/governance/workload/overlays/<env>` (or `management/`) per cluster |
+| `applications/otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
+| `applications/otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
+| `applications/signoz.yaml`                 | SigNoz on management                                     |
+| `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
+
+Argo CD itself is installed by k3s (`local/k3s/management/argocd-helmchart.yaml`),
+not synced by Argo CD.
 
 ## queue-consumer
 
@@ -78,9 +112,9 @@ it logs to stdout.
 
 | Stage    | Replicas | Overlay                                |
 | -------- | -------- | -------------------------------------- |
-| internal | 1        | `apps/queue-consumer/overlays/internal` |
-| stg      | 2        | `apps/queue-consumer/overlays/stg`      |
-| prod     | 3        | `apps/queue-consumer/overlays/prod`     |
+| internal | 1        | `gitops/apps/queue-consumer/overlays/internal` |
+| stg      | 2        | `gitops/apps/queue-consumer/overlays/stg`      |
+| prod     | 3        | `gitops/apps/queue-consumer/overlays/prod`     |
 
 The base sets only standard `OTEL_*` env vars, identical on every stage. It
 sends to the node-local otel-agent, which adds the environment. The image is

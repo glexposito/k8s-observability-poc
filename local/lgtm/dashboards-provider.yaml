@@ -1,0 +1,19 @@
+# Grafana dashboard provider for the lgtm Compose service. compose.yaml
+# mounts this file into otel-lgtm's provisioning folder and
+# gitops/platform/observability/dashboards/grafana/ into
+# /otel-lgtm/dashboards/k8s-observability-poc. Grafana loads every JSON file
+# there on startup and rescans every 30 s, so editing a JSON file here updates
+# the dashboard with no restart.
+apiVersion: 1
+
+providers:
+  - name: k8s-observability-poc
+    type: file
+    folder: k8s-observability-poc
+    # Git is the source of truth: UI edits can't be saved over these files.
+    # Export the JSON and commit it instead.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /otel-lgtm/dashboards/k8s-observability-poc
+      foldersFromFilesStructure: false

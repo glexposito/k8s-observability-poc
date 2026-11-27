@@ -1,10 +1,10 @@
 # Kustomize conventions
 
-The standard every app under `apps/` follows. It's based on the
+The standard every app under `gitops/apps/` follows. It's based on the
 [Kustomize reference](https://kubectl.docs.kubernetes.io/references/kustomize/kustomization/)
 and the [Kubernetes guide](https://kubernetes.io/docs/tasks/manage-kubernetes-objects/kustomization/).
 
-1. **Layout:** `apps/<app>/base/` holds everything shared.
+1. **Layout:** `gitops/apps/<app>/base/` holds everything shared.
    `overlays/<stage>/` holds only what differs on that stage. Never copy
    base files into an overlay.
 2. **Use a built-in field when one exists:** `images:`, `replicas:`,
@@ -19,4 +19,4 @@ and the [Kubernetes guide](https://kubernetes.io/docs/tasks/manage-kubernetes-ob
    Use JSON 6902 only for what strategic merge can't reach, like CRD list
    items, and guard index paths with `op: test`.
 
-Check the result with `kubectl kustomize apps/<app>/overlays/<stage>`.
+Check the result with `kubectl kustomize gitops/apps/<app>/overlays/<stage>`.

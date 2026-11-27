@@ -1,0 +1,110 @@
+# Node agent: one per node on internal/stg/prod (gitops/argocd/applications/otel-collectors-appset.yaml).
+# Upstream opentelemetry-collector chart and the official k8s distribution,
+# nothing vendor-specific. It collects what can only be collected locally:
+#   - OTLP from apps on this node (hostPort 4317/4318, OTEL_EXPORTER_OTLP_ENDPOINT
+#     points at status.hostIP)
+#   - kubelet stats (node/pod/container CPU, memory, network, fs)
+#   - pod logs (/var/log/pods)
+# Then it tags everything with k8s.* attributes plus this cluster's identity and
+# forwards OTLP to the gateway on management. Backends are the gateway's
+# concern only.
+#
+# CLUSTER_NAME comes from the ApplicationSet (helm.valuesObject.extraEnvs).
+fullnameOverride: otel-agent
+mode: daemonset
+
+image:
+  repository: otel/opentelemetry-collector-k8s
+
+presets:
+  kubernetesAttributes:
+    enabled: true
+  kubeletMetrics:
+    enabled: true
+  logsCollection:
+    enabled: true
+
+# OTLP only - no legacy Jaeger/Zipkin listeners.
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+config:
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+
+  processors:
+    # Semantic-convention resource attributes. The environment filter in every
+    # backend relies on these.
+    resource/cluster:
+      attributes:
+        - key: k8s.cluster.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+        - key: deployment.environment.name
+          value: ${env:CLUSTER_NAME}
+          action: upsert
+
+  exporters:
+    otlp/gateway:
+      # Endpoint and TLS depend on how this cluster reaches management:
+      # values-local.yaml.
+      sending_queue:
+        enabled: true
+        queue_size: 2000
+      retry_on_failure:
+        enabled: true
+
+  connectors:
+    # Standard RED metrics from spans (traces.span.metrics.calls / .duration),
+    # so SigNoz and LGTM chart the exact same series, split by environment
+    # (Tempo's own span metrics only carry service, operation and status).
+    # Generated here rather than in the gateway: a pod's spans always reach its
+    # own node's agent, so every series has exactly one producer. Behind the
+    # gateway's 2 replicas, the same series could come from both and clash.
+    span_metrics:
+      namespace: traces.span.metrics
+      metrics_flush_interval: 15s
+      histogram:
+        unit: ms
+        explicit:
+          # Down to 0.1 ms: queue-consumer's fake work takes microseconds, and
+          # the default buckets start at 2 ms.
+          buckets: [0.1ms, 0.25ms, 0.5ms, 1ms, 2.5ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s]
+
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway, span_metrics]
+      # Span metrics inherit the spans' already-enriched resource attributes
+      # (k8s.*, environment), so they only need batching.
+      metrics/span_metrics:
+        receivers: [span_metrics]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/gateway]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, resource/cluster, batch]
+        exporters: [otlp/gateway]

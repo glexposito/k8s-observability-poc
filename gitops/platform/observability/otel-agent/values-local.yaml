@@ -1,0 +1,16 @@
+# Laptop-only settings for the node agent: how a k3s workload cluster in
+# Docker reaches the gateway, and k3s's kubelet certificates.
+# Layered on top of values.yaml (gitops/argocd/applications/otel-collectors-appset.yaml).
+config:
+  receivers:
+    kubelet_stats:
+      # k3s kubelet serving certs aren't verifiable from the SA CA bundle.
+      insecure_skip_verify: true
+
+  exporters:
+    otlp/gateway:
+      # NodePort of the gateway Service on management. Resolved by the CoreDNS
+      # override in local/k3s/workload/cluster-dns.yaml.
+      endpoint: k3s-management:30317
+      tls:
+        insecure: true

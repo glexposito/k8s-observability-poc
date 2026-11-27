@@ -178,10 +178,10 @@ without explicit sizes still get defaults that fit inside the quota.
 | ------------------------------------------- | ---------------------------------------------------------- |
 | Clusters per environment                    | `internal` / `stg` / `prod` clusters                       |
 | Same namespace name in every environment    | `queue-consumer` on all three, no `-prod` suffix           |
-| Platform team creates namespaces            | `manifests/` + Argo CD (GitOps), not the app               |
+| Platform team creates namespaces            | `gitops/platform/governance/` + Argo CD (GitOps), not the app |
 | RoleBinding per tenant namespace            | Argo CD project `queue-consumer` can only deploy there     |
-| NetworkPolicy blocking other namespaces     | `manifests/base/queue-consumer-policies.yaml`              |
-| ResourceQuota per tenant namespace          | same file, pod count per cluster in `manifests/overlays/`  |
+| NetworkPolicy blocking other namespaces     | `gitops/platform/governance/workload/base/queue-consumer-policies.yaml` |
+| ResourceQuota per tenant namespace          | same file, pod count per environment in `workload/overlays/` |
 | Platform namespaces kept separate           | `observability`, `argocd`, `signoz`                        |
 | Ownership by label, not by namespace        | `team: platform` on those three, `team: team-1` on `queue-consumer` |
 

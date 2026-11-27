@@ -1,0 +1,40 @@
+# One queue-consumer Application per workload cluster (queue-consumer-internal,
+# -stg, -prod), each syncing its overlay: 1 / 2 / 3 replicas. Every overlay
+# deploys to the same queue-consumer namespace. The environment shows up in
+# telemetry as deployment.environment.name, stamped by the otel-agent, not
+# in names.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: queue-consumer-appset
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - stage: internal
+            server: https://k3s-internal:6443
+          - stage: stg
+            server: https://k3s-stg:6443
+          - stage: prod
+            server: https://k3s-prod:6443
+  template:
+    metadata:
+      name: 'queue-consumer-{{stage}}'
+      namespace: argocd
+      labels:
+        stage: '{{stage}}'
+        environment: '{{stage}}'
+    spec:
+      project: queue-consumer
+      source:
+        repoURL: https://github.com/glexposito/k8s-observability-poc.git
+        targetRevision: HEAD
+        path: 'gitops/apps/queue-consumer/overlays/{{stage}}'
+      destination:
+        server: '{{server}}'
+        namespace: queue-consumer
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

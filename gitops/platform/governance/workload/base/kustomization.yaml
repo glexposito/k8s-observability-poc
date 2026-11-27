@@ -1,0 +1,9 @@
+# Governance for every workload cluster (internal/stg/prod): the namespaces
+# plus each one's quota, limits and NetworkPolicy.
+# overlays/<env> only adds the environment labels and the pod quota.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - queue-consumer-policies.yaml
+  - observability-policies.yaml
