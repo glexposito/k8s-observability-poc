@@ -74,8 +74,10 @@ manages it.
 3. `argocd-bootstrap` runs `local/register-clusters.sh`: it registers
    internal/stg/prod (and management itself) with Argo CD as labelled
    cluster Secrets, and applies `gitops/argocd/root-app.yaml`.
-   From then on, Argo CD manages the declared configuration under `gitops/`
-   from git.
+   It then waits for the self-managed Argo CD Application to replace the bare
+   bootstrap server and become healthy, so the UI is ready before the job
+   exits. From then on, Argo CD manages the declared configuration under
+   `gitops/` from git.
 
 Bootstrap deliberately has three actors with separate ownership: k3s applies
 `local/k3s/`, `argocd-bootstrap` applies the initial root Application, and

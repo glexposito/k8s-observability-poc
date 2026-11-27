@@ -23,8 +23,13 @@ and **Grafana LGTM**. KISS.
 ## TL;DR
 
 ```bash
-docker compose up -d      # first start takes a few minutes (SigNoz the longest)
+docker compose up -d && docker compose wait argocd-bootstrap
 ```
+
+The command returns only after bootstrap has registered the clusters, submitted
+the root Application, and Argo CD has finished taking over its own server. Its
+UI is then ready at https://127.0.0.1:9000; the other Applications continue
+syncing afterward. The first start takes a few minutes (SigNoz is the slowest).
 
 You only need Docker, with about 12-16 GiB of RAM for it.
 

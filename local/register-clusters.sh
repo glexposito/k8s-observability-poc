@@ -64,4 +64,15 @@ register management https://kubernetes.default.svc management management \
 
 echo "Applying the root Application..."
 management apply -n argocd -f /gitops/root-app.yaml
+
+# The root app creates the self-managed Argo CD Application. That application
+# replaces the bare bootstrap installation's server pod, briefly resetting the
+# NodePort while it rolls out. Do not report bootstrap as finished until the
+# replacement is healthy and the UI is ready to serve requests.
+echo "Waiting for self-managed Argo CD to roll out..."
+management -n argocd wait --for=create application/argocd --timeout=300s
+management -n argocd wait --for=jsonpath='{.status.sync.status}'=Synced application/argocd --timeout=300s
+management -n argocd wait --for=jsonpath='{.status.health.status}'=Healthy application/argocd --timeout=300s
+management -n argocd rollout status deployment/argocd-server --timeout=300s
+
 echo "Managed clusters: internal, stg, prod, management. Argo CD UI: https://127.0.0.1:9000 (admin/123)"
