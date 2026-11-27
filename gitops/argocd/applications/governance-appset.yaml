@@ -1,8 +1,12 @@
 # One Application per cluster, syncing its governance layer (namespaces,
 # quotas, network policies) from gitops/platform/governance/. The workload is
 # handled separately by queue-consumer-appset.yaml.
-#   - internal/stg/prod: the Kustomize overlay workload/overlays/<env>.
-#   - management: management/ (its own namespaces and quotas) - Argo CD
+#
+# Clusters come from Argo CD's cluster Secrets, selected by label (see
+# docs/architecture.md, "Cluster labels"), so a new cluster only needs a
+# labelled Secret:
+#   - role=workload:   the Kustomize overlay workload/overlays/<environment>.
+#   - role=management: management/ (its own namespaces and quotas) - Argo CD
 #     manages the cluster it runs on too.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -10,36 +14,36 @@ metadata:
   name: clusters-appset
   namespace: argocd
 spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   generators:
-    - list:
-        elements:
-          - cluster: internal
-            server: https://k3s-internal:6443
-            path: gitops/platform/governance/workload/overlays/internal
-          - cluster: stg
-            server: https://k3s-stg:6443
-            path: gitops/platform/governance/workload/overlays/stg
-          - cluster: prod
-            server: https://k3s-prod:6443
-            path: gitops/platform/governance/workload/overlays/prod
-          - cluster: management
-            server: https://kubernetes.default.svc
-            path: gitops/platform/governance/management
+    - clusters:
+        selector:
+          matchLabels:
+            platform.example.com/role: workload
+        values:
+          path: 'gitops/platform/governance/workload/overlays/{{index .metadata.labels "platform.example.com/environment"}}'
+    - clusters:
+        selector:
+          matchLabels:
+            platform.example.com/role: management
+        values:
+          path: gitops/platform/governance/management
   template:
     metadata:
-      name: 'manifests-{{cluster}}'
+      name: 'manifests-{{.name}}'
       namespace: argocd
       labels:
-        environment: '{{cluster}}'
+        environment: '{{index .metadata.labels "platform.example.com/environment"}}'
         layer: governance
     spec:
       project: platform
       source:
         repoURL: https://github.com/glexposito/k8s-observability-poc.git
         targetRevision: HEAD
-        path: '{{path}}'
+        path: '{{.values.path}}'
       destination:
-        server: '{{server}}'
+        server: '{{.server}}'
       syncPolicy:
         automated:
           prune: true

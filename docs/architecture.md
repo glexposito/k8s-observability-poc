@@ -18,7 +18,7 @@ endpoint, k3s's kubelet certificates, fixed logins) live in a
 docker-compose.yaml          # entry point: includes local/compose.yaml
 local/
   compose.yaml               # 4× k3s, lgtm, argocd-bootstrap
-  register-clusters.sh       # registers internal/stg/prod with Argo CD, applies the root app
+  register-clusters.sh       # registers the clusters (labelled Secrets), applies the root app
   k3s/workload/              # applied by k3s on internal/stg/prod
   k3s/management/            # applied by k3s on management (incl. the Argo CD installer)
   lgtm/                      # Grafana dashboard provider for the lgtm container
@@ -46,7 +46,8 @@ manages it.
 2. k3s installs a bare Argo CD on management from
    `local/k3s/management/argocd-helmchart.yaml`.
 3. `argocd-bootstrap` runs `local/register-clusters.sh`: it registers
-   internal/stg/prod with Argo CD and applies `gitops/argocd/root-app.yaml`.
+   internal/stg/prod (and management itself) with Argo CD as labelled
+   cluster Secrets, and applies `gitops/argocd/root-app.yaml`.
    From then on, Argo CD manages everything under `gitops/` from git.
 
 Each file is applied by exactly one of the two: k3s applies `local/k3s/`,
@@ -94,12 +95,11 @@ All of it is plain Kustomize, synced by Argo CD only. Check an overlay with
 | ------------------------------------------ | -------------------------------------------------------- |
 | `root-app.yaml`                            | App of apps: syncs everything else in `gitops/argocd/`   |
 | `projects/`                                | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
-| `applications/governance-appset.yaml`      | `platform/governance/workload/overlays/<env>` (or `management/`) per cluster |
+| `applications/governance-appset.yaml`      | `platform/governance/workload/overlays/<environment>` (or `management/`) per cluster |
 | `applications/otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
 | `applications/otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
 | `applications/signoz.yaml`                 | SigNoz on management                                     |
-| `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per stage                |
-
+| `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per workload cluster     |
 | `applications/argocd.yaml`                 | Argo CD itself (self-managed)                            |
 | `install/`                                 | Argo CD's Helm values: `values.yaml` + `values-local.yaml` |
 
@@ -112,6 +112,33 @@ the chart version in both files). On AKS, the bootstrap install belongs to the
 cluster provisioning instead (e.g. Terraform's `helm_release`, ignoring later
 changes). The Application has no resources-finalizer, so deleting it never
 deletes Argo CD.
+
+### Cluster labels
+
+No file in `gitops/` lists the clusters. The ApplicationSets use Argo CD's
+cluster generator, which reads the cluster Secrets Argo CD already has and
+selects them by label:
+
+| Label                              | Values                  | Used for |
+| ---------------------------------- | ----------------------- | -------- |
+| `platform.example.com/role`        | `workload`, `management` | Which ApplicationSets target the cluster: workload clusters get governance overlays, collectors and apps; management gets `governance/management/` |
+| `platform.example.com/environment` | `internal`, `stg`, `prod`, `management` | Which overlay it gets (`overlays/<environment>`) |
+| `platform.example.com/provider`    | `local` (k3s in Docker) | Which `values-<provider>.yaml` the collectors get. A provider without its own file just gets `values.yaml` |
+
+Adding a cluster means registering one labelled Secret, with no change in
+`gitops/`. Locally, `local/register-clusters.sh` creates them; on AKS the
+cluster provisioning would. Management gets a Secret too, pointing at
+`https://kubernetes.default.svc` with Argo CD's own service account, because
+Argo CD's built-in in-cluster entry has no labels to select on.
+
+The cluster name and the environment are separate on purpose: here every
+cluster is its own environment, but two prod clusters would share
+`environment=prod` (same overlay) and keep distinct names (distinct
+Applications, distinct `k8s.cluster.name`).
+
+The AppProjects don't list clusters either: `platform` may deploy to any
+registered cluster, and `queue-consumer` to its own namespace on any
+registered cluster except management (a `!` deny rule).
 
 ## queue-consumer
 

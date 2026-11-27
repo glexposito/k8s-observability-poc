@@ -15,13 +15,14 @@ spec:
   description: queue-consumer - owns the queue-consumer namespace on each cluster only.
   sourceRepos:
     - https://github.com/glexposito/k8s-observability-poc.git
+  # Its own namespace on any registered cluster except management. A
+  # destination is allowed only if an allow rule matches and no `!` rule
+  # rejects it, so the second entry is a deny, not an extra allow.
   destinations:
-    - server: https://k3s-internal:6443
+    - server: '*'
       namespace: queue-consumer
-    - server: https://k3s-stg:6443
-      namespace: queue-consumer
-    - server: https://k3s-prod:6443
-      namespace: queue-consumer
+    - server: '!https://kubernetes.default.svc'
+      namespace: '*'
   clusterResourceWhitelist: []
   namespaceResourceWhitelist:
     - group: apps

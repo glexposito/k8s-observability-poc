@@ -27,14 +27,10 @@ spec:
     - https://charts.signoz.io
     # Argo CD itself (gitops/argocd/applications/argocd.yaml).
     - https://argoproj.github.io/argo-helm
+  # Any registered cluster: registering a cluster Secret is the gate, so the
+  # project doesn't repeat the cluster list.
   destinations:
-    - server: https://kubernetes.default.svc
-      namespace: '*'
-    - server: https://k3s-internal:6443
-      namespace: '*'
-    - server: https://k3s-stg:6443
-      namespace: '*'
-    - server: https://k3s-prod:6443
+    - server: '*'
       namespace: '*'
   clusterResourceWhitelist:
     - group: ''

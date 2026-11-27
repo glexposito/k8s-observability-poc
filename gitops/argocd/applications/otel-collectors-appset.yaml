@@ -1,44 +1,44 @@
-# The collection layer (OpenTelemetry's agent pattern): workload clusters ×
-# {agent, k8s-state}, so 6 Applications (otel-agent-prod, otel-k8s-state-prod,
-# ...). Each one sends OTLP to the gateway on management
-# (applications/otel-gateway.yaml) and knows nothing about backends.
+# The collection layer (OpenTelemetry's agent pattern): every workload cluster
+# (cluster Secrets labelled role=workload) × {agent, k8s-state}, so 6
+# Applications here (otel-agent-prod, otel-k8s-state-prod, ...). Each one sends
+# OTLP to the gateway on management (applications/otel-gateway.yaml) and knows
+# nothing about backends.
 #   agent     - DaemonSet, one per node: app OTLP, kubelet stats, pod logs
 #   k8s-state - Deployment, 1 replica: Kubernetes object state from the API
 #               (k8s_cluster) and events. Collected once per cluster, since a
 #               DaemonSet would report every object once per node.
 #
-# Upstream OpenTelemetry chart. Values live in git
-# (gitops/platform/observability/otel-<component>/values.yaml,
-# plus values-local.yaml for the k3s/Docker specifics) through a multi-source `$values`
-# ref. The only per-cluster input is CLUSTER_NAME, which becomes
-# k8s.cluster.name and deployment.environment.name on every signal.
+# Upstream OpenTelemetry chart. Values live in git through a multi-source
+# `$values` ref: gitops/platform/observability/otel-<component>/values.yaml,
+# plus values-<provider>.yaml from the cluster's provider label (how that kind
+# of cluster reaches the gateway). The only other per-cluster input is
+# CLUSTER_NAME, which becomes k8s.cluster.name and deployment.environment.name
+# on every signal.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: otel-collectors-appset
   namespace: argocd
 spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
   generators:
     - matrix:
         generators:
-          - list:
-              elements:
-                - cluster: internal
-                  server: https://k3s-internal:6443
-                - cluster: stg
-                  server: https://k3s-stg:6443
-                - cluster: prod
-                  server: https://k3s-prod:6443
+          - clusters:
+              selector:
+                matchLabels:
+                  platform.example.com/role: workload
           - list:
               elements:
                 - component: agent
                 - component: k8s-state
   template:
     metadata:
-      name: 'otel-{{component}}-{{cluster}}'
+      name: 'otel-{{.component}}-{{.name}}'
       namespace: argocd
       labels:
-        environment: '{{cluster}}'
+        environment: '{{index .metadata.labels "platform.example.com/environment"}}'
         layer: observability
     spec:
       project: platform
@@ -47,20 +47,22 @@ spec:
           chart: opentelemetry-collector
           targetRevision: 0.183.2 # collector 0.165.0
           helm:
-            releaseName: 'otel-{{component}}'
+            releaseName: 'otel-{{.component}}'
             valueFiles:
-              - '$values/gitops/platform/observability/otel-{{component}}/values.yaml'
-              # How this cluster reaches the gateway, and k3s specifics.
-              - '$values/gitops/platform/observability/otel-{{component}}/values-local.yaml'
+              - '$values/gitops/platform/observability/otel-{{.component}}/values.yaml'
+              # Per kind of cluster: values-local.yaml for k3s in Docker.
+              - '$values/gitops/platform/observability/otel-{{.component}}/values-{{index .metadata.labels "platform.example.com/provider"}}.yaml'
+            # A provider without its own file just gets values.yaml.
+            ignoreMissingValueFiles: true
             valuesObject:
               extraEnvs:
                 - name: CLUSTER_NAME
-                  value: '{{cluster}}'
+                  value: '{{.name}}'
         - repoURL: https://github.com/glexposito/k8s-observability-poc.git
           targetRevision: HEAD
           ref: values
       destination:
-        server: '{{server}}'
+        server: '{{.server}}'
         namespace: observability
       syncPolicy:
         automated:
