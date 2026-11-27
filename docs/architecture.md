@@ -106,7 +106,10 @@ Check an overlay with
 | `applications/argocd.yaml`                 | Argo CD itself (self-managed)                            |
 | `install/`                                 | Argo CD's Helm values: `values.yaml` + `values-local.yaml` |
 
-**Argo CD manages itself.** It can't install itself the first time, so k3s
+**Argo CD manages itself**, as Argo CD's docs describe ("Argo CD is able to
+manage itself since all settings are represented by Kubernetes manifests";
+they suggest Kustomize on top of its base manifests, here it's the official
+Helm chart, same idea). It can't install itself the first time, so k3s
 installs a bare one from `local/k3s/management/argocd-helmchart.yaml`. That
 file holds only what must match before the takeover: the chart version and
 `fullnameOverride`. On its first sync, `applications/argocd.yaml` applies
@@ -178,3 +181,28 @@ The base sets only standard `OTEL_*` env vars, identical on every stage. It
 sends to the node-local otel-collector, which adds the environment. The image is
 built and pushed to `ghcr.io/glexposito/queue-consumer` by that repo's
 `publish` workflow. Each overlay pins it under `images:`.
+
+## Sources
+
+Argo CD:
+
+- [Cluster generator](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Generators-Cluster/):
+  selecting clusters by cluster Secret labels, `values` per generator, and
+  why management needs its own Secret: "the default local cluster does not
+  have a Secret."
+- [Projects](https://argo-cd.readthedocs.io/en/stable/user-guide/projects/):
+  wildcard destinations and `!` deny rules (allowed only if an allow rule
+  matches and no deny rule rejects it).
+- [Helm](https://argo-cd.readthedocs.io/en/stable/user-guide/helm/):
+  `ignoreMissingValueFiles` for the `values-<provider>.yaml` files.
+- [Declarative setup → Manage Argo CD using Argo CD](https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#manage-argo-cd-using-argo-cd):
+  self-managed Argo CD.
+
+k3s (`local/` only):
+
+- [Auto-deploying manifests](https://docs.k3s.io/installation/packaged-components#auto-deploying-manifests-addons):
+  "any file found in `/var/lib/rancher/k3s/server/manifests` will automatically
+  be deployed", "both on startup and when the file is changed on disk".
+  Deleting a file there doesn't delete its resources.
+- [Helm](https://docs.k3s.io/add-ons/helm): the helm-controller and its
+  `HelmChart` resource, used for Argo CD's bootstrap install.

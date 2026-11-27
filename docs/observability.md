@@ -46,6 +46,24 @@ docs' terms, `otel-collector` is an
 [agent](https://opentelemetry.io/docs/collector/deploy/agent/): a collector
 next to the workload.
 
+**When the gateway earns its place, and when it doesn't.** Keep it when any
+of these holds:
+
+- **More than one backend**, or one you might swap: one place fans out, so
+  every backend gets identical data (the reason here).
+- **Backends you don't want every cluster to reach:** without a gateway,
+  every cluster needs network access and credentials (API keys) for every
+  backend. With it, only the gateway does.
+- **Central processing:** tail sampling, redacting sensitive data, dropping
+  noisy telemetry. These need one place that sees whole traces from all
+  collectors ("For use cases where telemetry data must be processed in a
+  specific Collector, use a two-tiered setup", OpenTelemetry's gateway page).
+
+Drop it when there's a single backend, reachable from each cluster with simple
+auth, and no central processing: then it's only an extra hop that can fail.
+The collectors export straight to the backend, and the gateway can come back
+when a second backend or sampling does.
+
 | Layer | Where | Does | Config |
 | --- | --- | --- | --- |
 | `otel-collector` | each workload cluster, DaemonSet | App OTLP, kubelet stats, pod logs, `k8sattributes` | `gitops/platform/observability/otel-collector/` |
@@ -130,3 +148,28 @@ SigNoz was set up through its sign-up page first, reset with
 
 **Footprint:** SigNoz (ClickHouse + ZooKeeper) plus LGTM add several GiB on
 top of the four k3s nodes. Give Docker 12-16 GiB.
+
+## Sources
+
+OpenTelemetry:
+
+- [Getting started with Kubernetes](https://opentelemetry.io/docs/platforms/kubernetes/getting-started/):
+  the two collectors and their names. "we'll need two installations of the
+  collector, one as a Daemonset and one as a Deployment"; "A deployment with
+  exactly one replica ensures that we don't produce duplicate data."
+- [Collector deployment: agent](https://opentelemetry.io/docs/collector/deploy/agent/):
+  "a Collector instance that runs alongside the application or on the same
+  host, such as a sidecar or DaemonSet."
+- [Collector deployment: gateway](https://opentelemetry.io/docs/collector/deploy/gateway/):
+  the optional central tier, and its cost: "It's one more thing to maintain
+  and that can fail (complexity)."
+- [opentelemetry-collector Helm chart README](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/README.md):
+  the presets used here. Pod logs need the DaemonSet ("It needs agent
+  collector to be deployed"); cluster metrics need "A single active instance",
+  with leader election when there are more replicas.
+- [k8sattributes processor README](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/k8sattributesprocessor/README.md):
+  extracting namespace labels (`extract.labels` with `from: namespace`), used
+  for `com.example.team` / `com.example.cost_center`.
+- [Semantic conventions → Naming](https://opentelemetry.io/docs/specs/semconv/general/naming/):
+  custom attribute names get a prefix, "your company's reverse domain name",
+  hence `com.example.*`.

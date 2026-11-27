@@ -22,6 +22,19 @@ How to decide what gets its own namespace, based on what Google (GKE), AWS
 - [Cluster isolation best practices for AKS](https://learn.microsoft.com/en-us/azure/aks/operator-best-practices-cluster-isolation)
 - [Use AKS in a multitenant solution](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/aks)
 
+**How namespaces are laid out as code**, section 10:
+
+- [Config Sync → Hierarchical repo](https://docs.cloud.google.com/kubernetes-engine/enterprise/config-sync/docs/concepts/hierarchical-repo):
+  "The name of a subdirectory should be the same as the name of the namespace
+  object." (Google now recommends its unstructured format instead; the
+  one-directory-per-namespace idea is what's borrowed here.)
+- [Flux multi-tenancy example](https://github.com/fluxcd/flux2-multi-tenancy):
+  its "**tenants** dir contains namespaces, RBAC and Flux custom resources for
+  registering tenant repositories", per tenant under `tenants/base/<team>/`.
+- [Kyverno → Generate rules](https://kyverno.io/docs/policy-types/cluster-policy/generate/):
+  "Create resources like a NetworkPolicy, ResourceQuota, and RoleBinding when a
+  new Namespace is created", kept in sync with `synchronize`.
+
 ## 1. What a tenant is
 
 A **tenant** is a group that shares a cluster with other groups but must be
@@ -333,7 +346,7 @@ of scale:
 
 | Approach | What it looks like | Used by |
 | --- | --- | --- |
-| **Folder per namespace, plain YAML** | One directory per namespace holding its `Namespace`, quota, limits, NetworkPolicy (and RoleBinding), written out in full. New ones are copied from an existing folder. | The baseline. Google Config Sync's hierarchical repo (`namespaces/<name>/`), Flux's multi-tenancy example (`tenants/<team>/`) |
+| **Folder per namespace, plain YAML** | One directory per namespace holding its `Namespace`, quota, limits, NetworkPolicy (and RoleBinding), written out in full. New ones are copied from an existing folder. | The baseline. Config Sync's hierarchical repo (a directory per namespace), Flux's multi-tenancy example (`tenants/base/<team>/`) |
 | **Folder per namespace + a policy engine** | Each folder only declares the `Namespace` with labels; a Kyverno `generate` policy creates and keeps in sync the quota, limits, default-deny NetworkPolicy and RoleBinding for every namespace with a tenant label. | Platforms with many tenants, usually once Kyverno is there for admission rules anyway |
 | **A multi-tenancy operator** | A `Tenant` resource (Capsule), Rancher Projects, OpenShift Projects. Tenants may create their own namespaces within enforced limits. | Self-service tenants. Not this model: here the platform creates namespaces (section 5) |
 
@@ -357,8 +370,8 @@ rename the folder and the names inside, add it to `workload/base/kustomization.y
 For a tenant, also add its Argo CD project in `gitops/argocd/projects/`
 (copy `queue-consumer.yaml`).
 
-**Next step at scale:** once Kyverno runs on the clusters (it's the usual
-choice for admission policies on AKS too), the per-folder `quota.yaml`,
+**Next step at scale:** once a policy engine that can generate resources,
+such as Kyverno, runs on the clusters, the per-folder `quota.yaml`,
 `limitrange.yaml` and `networkpolicy.yaml` can become `generate` policies.
 Each folder then shrinks to `namespace.yaml` with labels such as
 `quota-tier: small`, and every namespace gets the same guardrails without
