@@ -1,5 +1,5 @@
 # Same governance pattern as every other cluster (see
-# manifests/<cluster>/01-policies.yaml): a quota/limit ceiling plus a
+# manifests/base/): a quota/limit ceiling plus a
 # default-deny-except-same-namespace NetworkPolicy, sized to comfortably
 # hold Argo CD's own components. The observability namespace has its own
 # guardrails in 02-observability.yaml.

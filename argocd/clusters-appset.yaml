@@ -1,11 +1,10 @@
-# One Application per cluster, each syncing that cluster's manifests/
-# directory from this repo (namespaces, quotas, RBAC, network policies) -
-# the same content k3s's own auto-deploy mechanism applies today, now
-# managed via GitOps instead. This is the governance layer; the actual
-# workload is handled separately by queue-consumer-appset.yaml. Includes
-# management itself (syncing manifests/management/, its own namespace/
-# quota/CoreDNS) - Argo CD self-manages the cluster it runs on the same
-# way it manages every other one.
+# One Application per cluster, syncing its governance layer (namespaces,
+# quotas, RBAC, network policies) from this repo. The workload is handled
+# separately by queue-consumer-appset.yaml.
+#   - internal/stg/prod: the Kustomize overlay manifests/overlays/<cluster>,
+#     which includes manifests/bootstrap/ (also applied by k3s at startup).
+#   - management: plain manifests/management/ (its own namespaces/quota/
+#     CoreDNS) - Argo CD self-manages the cluster it runs on too.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -17,12 +16,16 @@ spec:
         elements:
           - cluster: internal
             server: https://k3s-internal:6443
+            path: manifests/overlays/internal
           - cluster: stg
             server: https://k3s-stg:6443
+            path: manifests/overlays/stg
           - cluster: prod
             server: https://k3s-prod:6443
+            path: manifests/overlays/prod
           - cluster: management
             server: https://kubernetes.default.svc
+            path: manifests/management
   template:
     metadata:
       name: 'manifests-{{cluster}}'
@@ -35,7 +38,7 @@ spec:
       source:
         repoURL: https://github.com/glexposito/k8s-observability-poc.git
         targetRevision: HEAD
-        path: 'manifests/{{cluster}}'
+        path: '{{path}}'
       destination:
         server: '{{server}}'
       syncPolicy:

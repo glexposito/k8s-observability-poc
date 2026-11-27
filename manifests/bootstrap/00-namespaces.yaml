@@ -1,0 +1,26 @@
+# Namespaces on every workload cluster (internal/stg/prod). Each cluster is
+# one environment, so names carry no stage suffix: queue-consumer is
+# "queue-consumer" on every cluster, and deployment.environment.name (stamped
+# by the otel-agent) tells the environments apart in telemetry. See
+# docs/architecture.md.
+#
+# The environment/stage labels aren't here: this file is shared, so
+# manifests/overlays/<cluster> adds them when Argo CD syncs it.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: queue-consumer
+  labels:
+    cost-center: cc-2000
+    managed-by: k8s-observability-poc
+---
+# The OpenTelemetry collection layer: the otel-agent DaemonSet and the
+# otel-k8s-state collector (argocd/otel-collectors-appset.yaml). Both forward
+# to the gateway on management.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observability
+  labels:
+    cost-center: cc-1000
+    managed-by: k8s-observability-poc

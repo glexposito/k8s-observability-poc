@@ -1,0 +1,9 @@
+# Governance for every workload cluster (internal/stg/prod): the bootstrap
+# files plus each namespace's quota, limits and NetworkPolicy.
+# overlays/<cluster> only adds the environment labels and the pod quota.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../bootstrap
+  - queue-consumer-policies.yaml
+  - observability-policies.yaml

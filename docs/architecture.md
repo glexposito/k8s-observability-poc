@@ -10,8 +10,9 @@ manages it.
 
 `docker compose up -d` does everything, with no scripts:
 
-1. Each k3s container auto-applies its `manifests/<cluster>/`, which is
-   bind-mounted in.
+1. Each k3s container auto-applies its bootstrap manifests, which are
+   bind-mounted in: `manifests/bootstrap/` on internal/stg/prod (shared),
+   `manifests/management/` on management.
 2. k3s installs Argo CD on management from `argocd/helmchart.yaml`.
 3. `argocd-bootstrap` registers internal/stg/prod with Argo CD and applies
    `argocd/root-app.yaml`. From then on, Argo CD manages everything from git.
@@ -37,8 +38,22 @@ environment, so names have no stage suffix: queue-consumer lives in
 namespace (`queue-consumer-prod`) only makes sense when several
 environments share a cluster.
 
-Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
-(`manifests/<cluster>/`), sized per environment.
+Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy,
+sized per environment.
+
+### Governance manifests (`manifests/`)
+
+| Path                    | Applied by                  | What                                             |
+| ----------------------- | --------------------------- | ------------------------------------------------ |
+| `bootstrap/`            | k3s at startup + Argo CD    | Namespaces, CoreDNS override, Argo CD's ServiceAccount. Shared by internal/stg/prod |
+| `base/`                 | Argo CD (Kustomize)         | `bootstrap/` + quotas, limits and NetworkPolicies |
+| `overlays/<cluster>/`   | Argo CD (Kustomize)         | Only what differs: `environment`/`stage` labels and the queue-consumer pod quota |
+| `management/`           | k3s at startup + Argo CD    | Plain YAML, management is genuinely different    |
+
+`bootstrap/` stays plain YAML because k3s applies it before Argo CD can reach
+the cluster, and k3s doesn't run Kustomize. Argo CD syncs it too (through
+`base/`), so `prune: true` never deletes it. Check an overlay with
+`kubectl kustomize manifests/overlays/<cluster>`.
 
 ## Argo CD (`argocd/`)
 
@@ -46,7 +61,7 @@ Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy
 | ----------------------------- | -------------------------------------------------------- |
 | `helmchart.yaml`              | Argo CD itself, installed by k3s                         |
 | `root-app.yaml`               | App of apps: syncs everything else in `argocd/`          |
-| `clusters-appset.yaml`        | `manifests/<cluster>/` per cluster                       |
+| `clusters-appset.yaml`        | `manifests/overlays/<cluster>` (or `manifests/management`) per cluster |
 | `otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
 | `otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
 | `signoz.yaml`                 | SigNoz on management                                     |

@@ -67,7 +67,7 @@ config:
   exporters:
     otlp/gateway:
       # NodePort of the gateway Service on management. Resolved by the CoreDNS
-      # override in manifests/<cluster>/05-cluster-dns.yaml.
+      # override in manifests/bootstrap/05-cluster-dns.yaml.
       endpoint: k3s-management:30317
       tls:
         insecure: true

@@ -1,0 +1,14 @@
+# Applied two ways, so it must stay plain YAML:
+#  - k3s auto-applies this folder at startup (docker-compose.yaml mounts it
+#    into internal/stg/prod), before Argo CD can reach the cluster: Argo CD
+#    needs 20-argocd-manager.yaml to log in and 05-cluster-dns.yaml so the
+#    collectors can find the gateway.
+#  - Argo CD then keeps syncing it through ../base, so prune never deletes it.
+# Named "Kustomization" with no extension on purpose: k3s only applies
+# *.yaml/*.yml/*.json, so it skips this file.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespaces.yaml
+  - 05-cluster-dns.yaml
+  - 20-argocd-manager.yaml

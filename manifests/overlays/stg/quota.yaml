@@ -1,0 +1,10 @@
+# 2 queue-consumer replica(s) (apps/queue-consumer/overlays/stg) + 1 surge pod
+# during a rollout.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: queue-consumer-quota
+  namespace: queue-consumer
+spec:
+  hard:
+    pods: "5"

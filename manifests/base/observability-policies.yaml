@@ -1,17 +1,6 @@
-# The OpenTelemetry collection layer on stg: the otel-agent DaemonSet and
-# the otel-k8s-state collector (argocd/otel-collectors-appset.yaml). Both forward
-# to the gateway on management. Same governance shape as the workload
-# namespaces.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: observability
-  labels:
-    environment: stg
-    stage: stg
-    cost-center: cc-1000
-    managed-by: k8s-observability-poc
----
+# Guardrails for the observability namespace (bootstrap/00-namespaces.yaml),
+# identical on every workload cluster.
+#
 # One agent per node (single node here) + otel-k8s-state, with room for
 # a rolling update of each.
 apiVersion: v1

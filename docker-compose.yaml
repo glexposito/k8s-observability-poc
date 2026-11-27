@@ -17,7 +17,7 @@ services:
     volumes:
       - internal-data:/var/lib/rancher/k3s
       - internal-kubeconfig:/etc/rancher/k3s
-      - ./manifests/internal:/var/lib/rancher/k3s/server/manifests/custom:ro
+      - ./manifests/bootstrap:/var/lib/rancher/k3s/server/manifests/custom:ro
 
     networks:
       k8s-management:
@@ -51,7 +51,7 @@ services:
     volumes:
       - stg-data:/var/lib/rancher/k3s
       - stg-kubeconfig:/etc/rancher/k3s
-      - ./manifests/stg:/var/lib/rancher/k3s/server/manifests/custom:ro
+      - ./manifests/bootstrap:/var/lib/rancher/k3s/server/manifests/custom:ro
 
     networks:
       k8s-management:
@@ -82,7 +82,7 @@ services:
     volumes:
       - prod-data:/var/lib/rancher/k3s
       - prod-kubeconfig:/etc/rancher/k3s
-      - ./manifests/prod:/var/lib/rancher/k3s/server/manifests/custom:ro
+      - ./manifests/bootstrap:/var/lib/rancher/k3s/server/manifests/custom:ro
 
     networks:
       k8s-management:
