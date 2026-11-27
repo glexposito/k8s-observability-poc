@@ -1,5 +1,5 @@
 # A worker: it only makes outbound connections (OTLP to the node's
-# otel-agent), so it accepts nothing from outside its namespace.
+# otel-collector), so it accepts nothing from outside its namespace.
 # k3s's embedded kube-router enforces it.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

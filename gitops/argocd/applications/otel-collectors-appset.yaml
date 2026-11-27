@@ -1,19 +1,22 @@
-# The collection layer (OpenTelemetry's agent pattern): every workload cluster
-# (cluster Secrets labelled role=workload) × {agent, k8s-state}, so 6
-# Applications here (otel-agent-prod, otel-k8s-state-prod, ...). Each one sends
+# The collection layer: every workload cluster (cluster Secrets labelled
+# role=workload) × the two collectors, so 6 Applications here
+# (otel-collector-prod, otel-collector-cluster-prod, ...). Each one sends
 # OTLP to the gateway on management (applications/otel-gateway.yaml) and knows
-# nothing about backends.
-#   agent     - DaemonSet, one per node: app OTLP, kubelet stats, pod logs
-#   k8s-state - Deployment, 1 replica: Kubernetes object state from the API
-#               (k8s_cluster) and events. Collected once per cluster, since a
-#               DaemonSet would report every object once per node.
+# nothing about backends. Two collectors, named as in OpenTelemetry's
+# Kubernetes getting-started guide (https://opentelemetry.io/docs/platforms/kubernetes/getting-started/):
+#   collector         - DaemonSet, one per node: its own node (app OTLP,
+#                       kubelet stats, pod logs)
+#   collector-cluster - Deployment, 1 replica: the Kubernetes API (object
+#                       state and events). Once per cluster, since a
+#                       DaemonSet would report every object once per node.
 #
 # Upstream OpenTelemetry chart. Values live in git through a multi-source
 # `$values` ref: gitops/platform/observability/otel-<component>/values.yaml,
 # plus values-<provider>.yaml from the cluster's provider label (how that kind
-# of cluster reaches the gateway). The only other per-cluster input is
-# CLUSTER_NAME, which becomes k8s.cluster.name and deployment.environment.name
-# on every signal.
+# of cluster reaches the gateway). The other per-cluster inputs come from the
+# cluster Secret: CLUSTER_NAME (its name) becomes k8s.cluster.name and
+# ENVIRONMENT (its environment label) becomes deployment.environment.name on
+# every signal. Two prod clusters share the environment, not the name.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -31,15 +34,15 @@ spec:
                   platform.example.com/role: workload
           - list:
               elements:
-                - component: agent
-                - component: k8s-state
+                - component: collector
+                - component: collector-cluster
   template:
     metadata:
       name: 'otel-{{.component}}-{{.name}}'
       namespace: argocd
       labels:
-        environment: '{{index .metadata.labels "platform.example.com/environment"}}'
-        layer: observability
+        platform.example.com/environment: '{{index .metadata.labels "platform.example.com/environment"}}'
+        platform.example.com/layer: observability
     spec:
       project: platform
       sources:
@@ -58,6 +61,8 @@ spec:
               extraEnvs:
                 - name: CLUSTER_NAME
                   value: '{{.name}}'
+                - name: ENVIRONMENT
+                  value: '{{index .metadata.labels "platform.example.com/environment"}}'
         - repoURL: https://github.com/glexposito/k8s-observability-poc.git
           targetRevision: HEAD
           ref: values

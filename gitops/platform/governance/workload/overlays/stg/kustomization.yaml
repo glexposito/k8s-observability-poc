@@ -4,7 +4,6 @@ resources:
   - ../../base
 labels:
   - pairs:
-      environment: stg
-      stage: stg
+      platform.example.com/environment: stg
 patches:
   - path: quota.yaml

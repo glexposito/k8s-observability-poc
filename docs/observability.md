@@ -6,33 +6,50 @@ distribution, OTLP on every hop, and semantic-convention attributes. SigNoz and
 LGTM are just two OTLP endpoints at the end.
 
 ```
- COLLECTION LAYER (agents)                               GATEWAY LAYER
+ COLLECTION LAYER                                        GATEWAY LAYER
  internal / stg / prod, each:                            management:
  ┌───────────────────────────────────────┐             ┌────────────────────────────┐
- │ apps ─OTLP─► otel-agent               │             │ otel-gateway (2 replicas)  │──► SigNoz (signoz ns)
+ │ apps ─OTLP─► otel-collector           │             │ otel-gateway (2 replicas)  │──► SigNoz (signoz ns)
  │              DaemonSet, 1 per node    │  OTLP gRPC  │  NodePort 30317 / 30318    │
  │              kubelet stats, pod logs  │ ──────────► │  receives from every       │
- │ otel-k8s-state                        │             │  cluster, fans out to all  │──► LGTM (Compose, lgtm:4318)
+ │ otel-collector-cluster                │             │  cluster, fans out to all  │──► LGTM (Compose, lgtm:4318)
  │   Deployment, 1 per cluster           │             │  backends, own queue each  │
  │   k8s object state, events (k8s API)  │             └────────────────────────────┘
  └───────────────────────────────────────┘
 ```
 
-**Terminology** (from the OpenTelemetry Collector deployment docs):
+**The three collectors.** All three are the same software (the
+OpenTelemetry Collector). The two per-cluster ones are named and set up
+exactly as in OpenTelemetry's
+[Kubernetes getting-started guide](https://opentelemetry.io/docs/platforms/kubernetes/getting-started/),
+which installs "two installations of the collector, one as a Daemonset and
+one as a Deployment": `otel-collector` and `otel-collector-cluster`.
 
-- **Agent:** a collector next to the workload (here a DaemonSet, one per
-  node). `otel-k8s-state` belongs to the same per-cluster collection layer.
-  It's a single replica because Kubernetes object state and events must be
-  read from the API exactly once per cluster.
-- **Gateway:** standalone collector replicas behind one endpoint. They
-  receive from agents and do central processing (fan-out, sampling, routing).
-  That's `otel-gateway`.
-- **Collector fleet:** all of the above together.
+| Name | Runs | Looks at |
+| --- | --- | --- |
+| `otel-collector` | One per node of each workload cluster (DaemonSet; the chart names its pods `otel-collector-agent-…`) | Its own node: the apps' traces, metrics and logs, plus CPU/memory (kubelet stats) and pod logs |
+| `otel-collector-cluster` | One per workload cluster (Deployment, 1 replica) | The Kubernetes API: replicas, restarts, pod phases, node conditions, events. Like kube-state-metrics does for Prometheus. One replica, because a second would report everything twice |
+| `otel-gateway` | On management (2 replicas) | Nothing itself: it receives from every collector in every cluster and forwards to SigNoz and LGTM |
+
+Why two per cluster: node data (kubelet stats, pod log files, app OTLP) only
+exists on each node, so it needs a collector per node; cluster data (the
+Kubernetes API) is the same everywhere, so it must be read exactly once - in
+the guide's words, "a deployment with exactly one replica ensures that we
+don't produce duplicate data".
+
+The gateway is not in the guide; it's OpenTelemetry's optional
+[gateway pattern](https://opentelemetry.io/docs/collector/deploy/gateway/)
+(standalone replicas behind one endpoint, doing central processing). It
+costs one more component to run, and this repo uses it so that SigNoz and
+LGTM get identical data and backends are configured in one file. In the
+docs' terms, `otel-collector` is an
+[agent](https://opentelemetry.io/docs/collector/deploy/agent/): a collector
+next to the workload.
 
 | Layer | Where | Does | Config |
 | --- | --- | --- | --- |
-| `otel-agent` | each workload cluster, DaemonSet | App OTLP, kubelet stats, pod logs, `k8sattributes` | `gitops/platform/observability/otel-agent/` |
-| `otel-k8s-state` | each workload cluster, 1 replica | Kubernetes object state (`k8s_cluster`: replicas, pod phases, restarts, node conditions) and events, from the API, exactly once per cluster | `gitops/platform/observability/otel-k8s-state/` |
+| `otel-collector` | each workload cluster, DaemonSet | App OTLP, kubelet stats, pod logs, `k8sattributes` | `gitops/platform/observability/otel-collector/` |
+| `otel-collector-cluster` | each workload cluster, 1 replica | Kubernetes object state (`k8s_cluster`: replicas, pod phases, restarts, node conditions) and events, from the API, exactly once per cluster | `gitops/platform/observability/otel-collector-cluster/` |
 | `otel-gateway` | management, 2 replicas | Only layer that knows the backends; fans out to all of them | `gitops/platform/observability/otel-gateway/` |
 | SigNoz | management, `signoz` ns | Backend (ClickHouse) | `gitops/platform/observability/signoz/` |
 | LGTM | Compose `lgtm` | Backend (Grafana, Loki, Tempo, Prometheus) | `local/compose.yaml` |
@@ -42,9 +59,19 @@ logs and `k8sattributes` only work from inside the cluster. Backends,
 credentials, sampling and fan-out belong in one place, so changing a backend
 is a single file (`otel-gateway/values.yaml`), not three clusters.
 
-**Environment identity:** each collector stamps `k8s.cluster.name` and
-`deployment.environment.name` (`internal`/`stg`/`prod`) from the
-ApplicationSet. Filter on those in either UI. Apps don't set them.
+**Environment identity:** each collector stamps `k8s.cluster.name` (the
+cluster's name) and `deployment.environment.name` (its
+`platform.example.com/environment` label: `internal`/`stg`/`prod`), both from
+the cluster's Argo CD cluster Secret via the ApplicationSet. They're separate
+on purpose: two prod clusters share the environment, not the name. Filter on
+those in either UI. Apps don't set them.
+
+**Ownership:** the otel-collector also copies the namespace's
+`platform.example.com/team` and `platform.example.com/cost-center` labels onto
+every signal from that namespace, as `com.example.team` and
+`com.example.cost_center` (custom attributes get a reverse-domain prefix, per
+the OpenTelemetry spec). In Prometheus they show up as `com_example_team` and
+`com_example_cost_center` on `target_info`.
 
 **Instrumenting an app:** use the OpenTelemetry SDK and the standard env vars
 (see `gitops/apps/queue-consumer/base/deployment.yaml`):
@@ -66,7 +93,7 @@ docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-co
 Then look for `telemetrygen` in SigNoz (http://127.0.0.1:3301) and in Grafana →
 Explore → Tempo (http://127.0.0.1:3000).
 
-**Span metrics:** the otel-agent's `span_metrics` connector turns every span
+**Span metrics:** the otel-collector's `span_metrics` connector turns every span
 into the standard `traces.span.metrics.calls` / `.duration` series (Prometheus:
 `traces_span_metrics_calls_total`, `traces_span_metrics_duration_milliseconds_*`).
 Both backends get the same rate, error and duration series, split by

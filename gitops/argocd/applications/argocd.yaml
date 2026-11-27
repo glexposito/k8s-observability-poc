@@ -12,8 +12,8 @@ metadata:
   name: argocd
   namespace: argocd
   labels:
-    environment: management
-    layer: bootstrap
+    platform.example.com/environment: management
+    platform.example.com/layer: bootstrap
 spec:
   project: platform
   sources:

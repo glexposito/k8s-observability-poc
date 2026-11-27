@@ -1,4 +1,4 @@
-# One agent per node (single node here) + otel-k8s-state, with room for
+# One agent per node (single node here) + otel-collector-cluster, with room for
 # a rolling update of each.
 apiVersion: v1
 kind: ResourceQuota

@@ -1,4 +1,8 @@
-# Node agent: one per node on internal/stg/prod (gitops/argocd/applications/otel-collectors-appset.yaml).
+# The DaemonSet collector: one per node on internal/stg/prod
+# (gitops/argocd/applications/otel-collectors-appset.yaml). Named and set up
+# as in OpenTelemetry's Kubernetes getting-started guide, which installs
+# otel-collector (DaemonSet) + otel-collector-cluster (Deployment):
+# https://opentelemetry.io/docs/platforms/kubernetes/getting-started/
 # Upstream opentelemetry-collector chart and the official k8s distribution,
 # nothing vendor-specific. It collects what can only be collected locally:
 #   - OTLP from apps on this node (hostPort 4317/4318, OTEL_EXPORTER_OTLP_ENDPOINT
@@ -9,8 +13,14 @@
 # forwards OTLP to the gateway on management. Backends are the gateway's
 # concern only.
 #
-# CLUSTER_NAME comes from the ApplicationSet (helm.valuesObject.extraEnvs).
-fullnameOverride: otel-agent
+# CLUSTER_NAME and ENVIRONMENT come from the ApplicationSet
+# (helm.valuesObject.extraEnvs), from the cluster's Argo CD cluster Secret.
+#
+# In daemonset mode the upstream chart always appends "-agent" to the
+# DaemonSet and its ConfigMap (hardcoded, no option), so the pods show up as
+# otel-collector-agent-<id>, the same as in the guide. "Agent" is the
+# OpenTelemetry docs' term for a collector next to the workload.
+fullnameOverride: otel-collector
 mode: daemonset
 
 image:
@@ -50,6 +60,21 @@ config:
     prometheus: null
 
   processors:
+    # On top of the preset's pod/workload metadata: the owning team and cost
+    # centre from the namespace's labels (gitops/platform/governance/), so every
+    # signal from a namespace says who owns it. Not semantic conventions, so
+    # the attribute names carry a reverse-domain prefix, as the OpenTelemetry
+    # spec asks for custom attributes.
+    k8s_attributes:
+      extract:
+        labels:
+          - from: namespace
+            key: platform.example.com/team
+            tag_name: com.example.team
+          - from: namespace
+            key: platform.example.com/cost-center
+            tag_name: com.example.cost_center
+
     # Semantic-convention resource attributes. The environment filter in every
     # backend relies on these.
     resource/cluster:
@@ -58,7 +83,7 @@ config:
           value: ${env:CLUSTER_NAME}
           action: upsert
         - key: deployment.environment.name
-          value: ${env:CLUSTER_NAME}
+          value: ${env:ENVIRONMENT}
           action: upsert
 
   exporters:

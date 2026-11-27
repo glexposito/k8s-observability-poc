@@ -1,10 +1,21 @@
-# Kubernetes state collector: one replica per workload cluster (gitops/argocd/applications/otel-collectors-appset.yaml).
-# Collects cluster-wide data, which has to happen exactly once per cluster
-# (a DaemonSet would duplicate it on every node):
-#   - k8s_cluster: deployment/pod/node state, replicas, restarts, phases
-#   - Kubernetes events, as logs
-# Same identity tagging and same gateway export as the node agent.
-fullnameOverride: otel-k8s-state
+# The Deployment collector: one replica per workload cluster
+# (gitops/argocd/applications/otel-collectors-appset.yaml), next to the
+# DaemonSet one (otel-collector). Named and set up as in OpenTelemetry's
+# Kubernetes getting-started guide: https://opentelemetry.io/docs/platforms/kubernetes/getting-started/
+#
+# It reports what Kubernetes itself knows about the cluster, read from the
+# Kubernetes API - the OpenTelemetry counterpart of kube-state-metrics:
+#   - k8s_cluster: the current state of Kubernetes objects, as metrics -
+#     desired vs available replicas, pod phases, container restarts, node
+#     conditions, job results
+#   - k8s_events: Kubernetes events (BackOff, FailedScheduling, OOMKilling...),
+#     as logs
+# That has to happen exactly once per cluster - in the guide's words, "a
+# deployment with exactly one replica ensures that we don't produce duplicate
+# data". Same identity tagging and same gateway export as otel-collector.
+# (The chart README notes more replicas are possible: leader election then
+# keeps a single active one.)
+fullnameOverride: otel-collector-cluster
 mode: deployment
 replicaCount: 1
 
@@ -61,7 +72,7 @@ config:
           value: ${env:CLUSTER_NAME}
           action: upsert
         - key: deployment.environment.name
-          value: ${env:CLUSTER_NAME}
+          value: ${env:ENVIRONMENT}
           action: upsert
 
   exporters:

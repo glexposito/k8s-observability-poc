@@ -4,7 +4,6 @@ resources:
   - ../../base
 labels:
   - pairs:
-      environment: internal
-      stage: internal
+      platform.example.com/environment: internal
 patches:
   - path: quota.yaml

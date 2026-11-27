@@ -4,7 +4,6 @@ resources:
   - ../../base
 labels:
   - pairs:
-      environment: prod
-      stage: prod
+      platform.example.com/environment: prod
 patches:
   - path: quota.yaml

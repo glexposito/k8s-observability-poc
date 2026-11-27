@@ -40,10 +40,10 @@ You only need Docker, with about 12-16 GiB of RAM for it.
  internal / stg / prod (each)                        management
  ┌─────────────────────────────────────┐            ┌─────────────────────────────┐
  │ queue-consumer                      │            │ Argo CD ── syncs everything │
- │ otel-agent      1 per node          │ ─ OTLP ──► │ otel-gateway (2 replicas) ──┼──► SigNoz (in-cluster)
- │ otel-k8s-state  1 per cluster       │            │                             │──► LGTM (Compose)
+ │ otel-collector         1/node       │ ─ OTLP ──► │ otel-gateway (2 replicas) ──┼──► SigNoz (in-cluster)
+ │ otel-collector-cluster 1/cluster    │            │                             │──► LGTM (Compose)
  └─────────────────────────────────────┘            └─────────────────────────────┘
-   collection layer (agents)                          gateway layer
+   collection layer                                   gateway layer
 ```
 
 | Cluster    | API              | Runs                                          |
@@ -69,7 +69,7 @@ per replica, so prod should show about 3x internal's rate.
 - **SigNoz → Services → `queue-consumer`**: switch environments, compare throughput
 - **Grafana → Explore → Tempo**: service `queue-consumer`, span `do_work`
 - **Grafana → Explore → Prometheus**: `rate(messages_processed_total[1m])` (resource attributes like the environment sit on `target_info`)
-- **Grafana → Explore → Loki**: `{k8s_namespace_name="queue-consumer"}` (stdout, shipped by the otel-agent)
+- **Grafana → Explore → Loki**: `{k8s_namespace_name="queue-consumer"}` (stdout, shipped by the otel-collector)
 
 ```bash
 docker exec k3s-prod kubectl -n queue-consumer get pods

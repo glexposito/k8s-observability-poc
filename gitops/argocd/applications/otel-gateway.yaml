@@ -9,8 +9,8 @@ metadata:
   name: otel-gateway
   namespace: argocd
   labels:
-    environment: management
-    layer: observability
+    platform.example.com/environment: management
+    platform.example.com/layer: observability
 spec:
   project: platform
   sources:

@@ -12,7 +12,7 @@ metadata:
   name: root
   namespace: argocd
   labels:
-    layer: bootstrap
+    platform.example.com/layer: bootstrap
 spec:
   project: default
   source:

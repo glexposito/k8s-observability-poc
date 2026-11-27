@@ -290,7 +290,7 @@
         "spec": {
           "display": {
             "name": "Replicas: available vs desired",
-            "description": "From otel-k8s-state (k8s_cluster receiver)."
+            "description": "From otel-collector-cluster (k8s_cluster receiver)."
           },
           "links": [],
           "plugin": {
@@ -375,7 +375,7 @@
         "spec": {
           "display": {
             "name": "CPU per pod",
-            "description": "Kubelet stats from the otel-agent, with the container limit."
+            "description": "Kubelet stats from the otel-collector, with the container limit."
           },
           "links": [],
           "plugin": {
@@ -464,7 +464,7 @@
         "spec": {
           "display": {
             "name": "Memory per pod (working set)",
-            "description": "Kubelet stats from the otel-agent, with the container limit (OOMKill above it)."
+            "description": "Kubelet stats from the otel-collector, with the container limit (OOMKill above it)."
           },
           "links": [],
           "plugin": {
@@ -553,7 +553,7 @@
         "spec": {
           "display": {
             "name": "Container restarts",
-            "description": "Total container restarts (otel-k8s-state). Anything above 0 means crashes or OOM kills."
+            "description": "Total container restarts (otel-collector-cluster). Anything above 0 means crashes or OOM kills."
           },
           "links": [],
           "plugin": {
@@ -665,7 +665,7 @@
         "spec": {
           "display": {
             "name": "queue-consumer logs",
-            "description": "Container stdout, shipped from /var/log/pods by the otel-agent."
+            "description": "Container stdout, shipped from /var/log/pods by the otel-collector."
           },
           "links": [],
           "plugin": {
@@ -706,7 +706,7 @@
         "spec": {
           "display": {
             "name": "Kubernetes warning events",
-            "description": "Warning events from Kubernetes (k8s_events receiver in otel-k8s-state): failed pulls, OOM kills, scheduling failures. Empty means no warnings since the collector started."
+            "description": "Warning events from Kubernetes (k8s_events receiver in otel-collector-cluster): failed pulls, OOM kills, scheduling failures. Empty means no warnings since the collector started."
           },
           "links": [],
           "plugin": {

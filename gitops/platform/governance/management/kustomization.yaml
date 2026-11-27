@@ -1,7 +1,7 @@
 # Governance for the management cluster: one folder per namespace, same
 # pattern as workload/base/. Not an environment overlay: management is a
 # platform cluster, not a promotion stage, so its namespaces carry
-# environment=management directly.
+# platform.example.com/environment: management directly.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

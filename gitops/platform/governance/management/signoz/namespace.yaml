@@ -8,8 +8,6 @@ kind: Namespace
 metadata:
   name: signoz
   labels:
-    team: platform
-    environment: management
-    stage: management
-    cost-center: cc-1000
-    managed-by: k8s-observability-poc
+    platform.example.com/team: platform
+    platform.example.com/environment: management
+    platform.example.com/cost-center: cc-1000

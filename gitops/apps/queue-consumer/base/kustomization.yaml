@@ -10,4 +10,9 @@ labels:
     includeSelectors: true
   - pairs:
       app.kubernetes.io/component: worker
-      app.kubernetes.io/managed-by: kustomize
+      # The tenant it belongs to (its namespace). With business domains this
+      # is the domain, e.g. domain-1.
+      app.kubernetes.io/part-of: queue-consumer
+    # On the pods too (not only the Deployment), where k8s_attributes and
+    # `kubectl get pods -l` see them. Not in the selector, which is immutable.
+    includeTemplates: true

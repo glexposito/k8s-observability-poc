@@ -240,7 +240,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "From otel-k8s-state (k8s_cluster receiver). Dashed = desired.",
+      "description": "From otel-collector-cluster (k8s_cluster receiver). Dashed = desired.",
       "gridPos": {
         "x": 0,
         "y": 10,
@@ -320,7 +320,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Kubelet stats from the otel-agent. Dashed = container limit.",
+      "description": "Kubelet stats from the otel-collector. Dashed = container limit.",
       "gridPos": {
         "x": 8,
         "y": 10,
@@ -400,7 +400,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Kubelet stats from the otel-agent. Dashed = container limit (OOMKill above it).",
+      "description": "Kubelet stats from the otel-collector. Dashed = container limit (OOMKill above it).",
       "gridPos": {
         "x": 16,
         "y": 10,
@@ -480,7 +480,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Total container restarts per environment (otel-k8s-state). Anything above 0 means crashes or OOM kills.",
+      "description": "Total container restarts per environment (otel-collector-cluster). Anything above 0 means crashes or OOM kills.",
       "gridPos": {
         "x": 0,
         "y": 18,
@@ -625,7 +625,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Container stdout, shipped from /var/log/pods by the otel-agent.",
+      "description": "Container stdout, shipped from /var/log/pods by the otel-collector.",
       "gridPos": {
         "x": 0,
         "y": 24,
@@ -660,7 +660,7 @@
         "type": "loki",
         "uid": "loki"
       },
-      "description": "Warning events from Kubernetes (k8s_events receiver in otel-k8s-state): failed pulls, OOM kills, scheduling failures.",
+      "description": "Warning events from Kubernetes (k8s_events receiver in otel-collector-cluster): failed pulls, OOM kills, scheduling failures.",
       "gridPos": {
         "x": 12,
         "y": 24,

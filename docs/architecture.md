@@ -63,7 +63,7 @@ There's no `kubectl` on the host. Each cluster ships its own:
 | Namespace        | Clusters            | Notes                                              |
 | ---------------- | ------------------- | -------------------------------------------------- |
 | `queue-consumer` | internal, stg, prod | The workload: 1 / 2 / 3 replicas                   |
-| `otel-collectors`| internal, stg, prod | OTel agent + k8s-state collector                   |
+| `otel-collectors`| internal, stg, prod | `otel-collector` (DaemonSet) + `otel-collector-cluster` (Deployment) |
 | `otel-gateway`   | management          | OTel gateway                                       |
 | `argocd`         | management          | Argo CD                                            |
 | `signoz`         | management          | SigNoz + ClickHouse                                |
@@ -71,7 +71,7 @@ There's no `kubectl` on the host. Each cluster ships its own:
 **One namespace per app, not per environment.** Each cluster is one
 environment, so names have no stage suffix: queue-consumer lives in
 `queue-consumer` on every cluster. Telemetry tells environments apart by
-`deployment.environment.name`, which the otel-agent stamps. A per-env
+`deployment.environment.name`, which the otel-collector stamps. A per-env
 namespace (`queue-consumer-prod`) only makes sense when several
 environments share a cluster. For the reasoning and Google's guidance behind
 this, see [namespaces.md](namespaces.md).
@@ -84,7 +84,7 @@ sized per environment.
 | Path                      | What                                                       |
 | ------------------------- | ---------------------------------------------------------- |
 | `workload/base/<namespace>/` | One folder per namespace (`otel-collectors`, `queue-consumer`): `namespace.yaml`, `quota.yaml`, `limitrange.yaml`, `networkpolicy.yaml`. Shared by internal/stg/prod |
-| `workload/overlays/<env>/`| Only what differs: `environment`/`stage` labels and the queue-consumer pod quota |
+| `workload/overlays/<env>/`| Only what differs: the `platform.example.com/environment` label and the queue-consumer pod quota |
 | `management/<namespace>/` | Same pattern for management's own namespaces (`argocd`, `otel-gateway`, `signoz`) |
 
 All of it is plain Kustomize, synced by Argo CD only. How to add a namespace,
@@ -99,7 +99,7 @@ Check an overlay with
 | `root-app.yaml`                            | App of apps: syncs everything else in `gitops/argocd/`   |
 | `projects/`                                | AppProjects: `platform` (cluster-scoped), `queue-consumer` (own namespace only) |
 | `applications/governance-appset.yaml`      | `platform/governance/workload/overlays/<environment>` (or `management/`) per cluster |
-| `applications/otel-collectors-appset.yaml` | otel-agent + otel-k8s-state per workload cluster         |
+| `applications/otel-collectors-appset.yaml` | otel-collector + otel-collector-cluster per workload cluster           |
 | `applications/otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
 | `applications/signoz.yaml`                 | SigNoz on management                                     |
 | `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per workload cluster     |
@@ -143,6 +143,24 @@ The AppProjects don't list clusters either: `platform` may deploy to any
 registered cluster, and `queue-consumer` to its own namespace on any
 registered cluster except management (a `!` deny rule).
 
+### Label scheme
+
+Every label this repo defines uses one prefix, `platform.example.com/`, so it
+can't clash with labels from Kubernetes, Helm charts or other tools. Apps use
+the standard `app.kubernetes.io/*` labels.
+
+| Label | On | Meaning |
+| --- | --- | --- |
+| `platform.example.com/role` | Cluster Secrets | `workload` or `management` |
+| `platform.example.com/environment` | Cluster Secrets, namespaces, governance resources, Applications | `internal`, `stg`, `prod`, `management` |
+| `platform.example.com/provider` | Cluster Secrets | `local` (k3s in Docker) |
+| `platform.example.com/team` | Namespaces | Owning team: `platform`, `team-1`. Copied to telemetry as `com.example.team` |
+| `platform.example.com/cost-center` | Namespaces | `cc-1000`, `cc-2000`. Copied to telemetry as `com.example.cost_center` |
+| `platform.example.com/layer` | Applications | `bootstrap`, `governance`, `observability`, for filtering in the Argo CD UI |
+| `app.kubernetes.io/name`, `component`, `part-of` | App workloads | Standard app labels. `part-of` is the tenant (its namespace) |
+
+`platform.example.com` is a placeholder: use your organisation's domain.
+
 ## queue-consumer
 
 [queue-consumer](https://github.com/glexposito/queue-consumer) is a Rust
@@ -157,6 +175,6 @@ it logs to stdout.
 | prod     | 3        | `gitops/apps/queue-consumer/overlays/prod`     |
 
 The base sets only standard `OTEL_*` env vars, identical on every stage. It
-sends to the node-local otel-agent, which adds the environment. The image is
+sends to the node-local otel-collector, which adds the environment. The image is
 built and pushed to `ghcr.io/glexposito/queue-consumer` by that repo's
 `publish` workflow. Each overlay pins it under `images:`.

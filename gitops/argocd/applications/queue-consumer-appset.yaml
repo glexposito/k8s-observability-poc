@@ -2,7 +2,7 @@
 # labelled role=workload), each syncing the overlay for that cluster's
 # environment label: 1 / 2 / 3 replicas. Every overlay deploys to the same
 # queue-consumer namespace. The environment shows up in telemetry as
-# deployment.environment.name, stamped by the otel-agent, not in names.
+# deployment.environment.name, stamped by the otel-collector, not in names.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -24,8 +24,7 @@ spec:
       name: 'queue-consumer-{{.name}}'
       namespace: argocd
       labels:
-        stage: '{{.values.environment}}'
-        environment: '{{.values.environment}}'
+        platform.example.com/environment: '{{.values.environment}}'
     spec:
       project: queue-consumer
       source:

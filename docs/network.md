@@ -13,7 +13,7 @@ are plain YAML in git with nothing to discover at runtime.
  │  k3s-internal   .101 ┐                                                                  │
  │  k3s-stg        .102 ├─ :6443 API ◄──────────────── Argo CD (on management)             │
  │  k3s-prod       .103 ┘                                                                  │
- │        │  queue-consumer ─► otel-agent (same node, hostPort 4318)                       │
+ │        │  queue-consumer ─► otel-collector (same node, hostPort 4318)                   │
  │        │                                                                                │
  │        │ OTLP gRPC → k3s-management:30317                                               │
  │        ▼                                                                                │
@@ -85,9 +85,9 @@ of this: Docker's DNS already resolves `k3s-<cluster>` for it.
 | Argo CD repo-server          | GitHub, Helm repos                        | 443 (out)       | This repo, Argo CD, OTel and SigNoz charts |
 | workload kubelets            | `ghcr.io`                                 | 443 (out)       | Pull `glexposito/queue-consumer`        |
 | `argocd-bootstrap`           | all four API servers                      | 6443            | One-shot cluster registration           |
-| queue-consumer pods          | `otel-agent` on their node (`$(NODE_IP)`) | 4318 (hostPort) | Traces + metrics (OTel SDK)             |
-| `otel-agent` (filelog)       | `/var/log/pods` on its node               | (local)         | queue-consumer stdout as logs           |
-| `otel-agent`, `otel-k8s-state` | `k3s-management`                        | 30317           | OTLP gRPC to the gateway                |
+| queue-consumer pods          | `otel-collector` on their node (`$(NODE_IP)`) | 4318 (hostPort) | Traces + metrics (OTel SDK)             |
+| `otel-collector` (filelog)       | `/var/log/pods` on its node               | (local)         | queue-consumer stdout as logs           |
+| `otel-collector`, `otel-collector-cluster` | `k3s-management`                          | 30317           | OTLP gRPC to the gateway                |
 | `otel-gateway`               | `signoz-otel-collector.signoz.svc`        | 4317            | Fan-out to SigNoz (in-cluster)          |
 | `otel-gateway`               | `lgtm`                                    | 4318            | Fan-out to LGTM                         |
 

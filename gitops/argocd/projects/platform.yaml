@@ -1,5 +1,5 @@
-# Platform-owned: namespace/quota/RBAC governance (manifests-internal,
-# manifests-stg, manifests-prod, manifests-management) and the observability
+# Platform-owned: namespace/quota/RBAC governance (governance-internal,
+# governance-stg, governance-prod, governance-management) and the observability
 # stack. This is the layer with cluster-scoped access, kept separate from the
 # queue-consumer project, which gets none at all.
 #

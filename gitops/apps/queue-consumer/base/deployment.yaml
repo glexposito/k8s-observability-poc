@@ -22,12 +22,12 @@ spec:
           env:
             - name: RUST_LOG
               value: info
-            # Plain-text console logs: the otel-agent ships them from
+            # Plain-text console logs: the otel-collector ships them from
             # /var/log/pods, and ANSI color codes would end up in the backends.
             - name: NO_COLOR
               value: "1"
             # Standard OpenTelemetry SDK configuration only, identical on every
-            # stage. Telemetry goes to the otel-agent on this node (hostPort
+            # stage. Telemetry goes to the otel-collector on this node (hostPort
             # 4318). The agent stamps deployment.environment.name and
             # k8s.cluster.name, and k8sattributes adds pod/namespace/deployment.
             # k8s.pod.uid lets k8sattributes match this pod reliably, even if
