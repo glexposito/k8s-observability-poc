@@ -56,15 +56,15 @@ filtered by `deployment.environment.name`.
 Send **cumulative** metrics (OTel's default). Prometheus in LGTM drops delta
 sums. SigNoz accepts both.
 
-**Try it from the host:** the gateway is also published on `localhost:4317`/`4318`:
+**Try it from the host:** the gateway is also published on `127.0.0.1:4317`/`4318`:
 
 ```bash
 docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
-  traces --otlp-insecure --otlp-endpoint localhost:4317 --traces 20 --service telemetrygen
+  traces --otlp-insecure --otlp-endpoint 127.0.0.1:4317 --traces 20 --service telemetrygen
 ```
 
-Then look for `telemetrygen` in SigNoz (http://localhost:3301) and in Grafana →
-Explore → Tempo (http://localhost:3000).
+Then look for `telemetrygen` in SigNoz (http://127.0.0.1:3301) and in Grafana →
+Explore → Tempo (http://127.0.0.1:3000).
 
 **Span metrics:** the otel-agent's `span_metrics` connector turns every span
 into the standard `traces.span.metrics.calls` / `.duration` series (Prometheus:

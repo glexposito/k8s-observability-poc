@@ -30,9 +30,9 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 
 | UI           | URL                         | Login           |
 | ------------ | --------------------------- | --------------- |
-| SigNoz       | http://localhost:3301       | `admin@playground.local` / `Playground123!` |
-| Grafana (LGTM) | http://localhost:3000     | `admin` / `admin` |
-| Argo CD      | https://localhost:9000      | `admin` / `123` |
+| SigNoz       | http://127.0.0.1:3301       | `admin@playground.local` / `Playground123!` |
+| Grafana (LGTM) | http://127.0.0.1:3000     | `admin` / `admin` |
+| Argo CD      | https://127.0.0.1:9000      | `admin` / `123` |
 
 ## What runs where
 
@@ -48,10 +48,10 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 
 | Cluster    | API              | Runs                                          |
 | ---------- | ---------------- | --------------------------------------------- |
-| management | `localhost:6447` | Argo CD, otel-gateway, SigNoz                 |
-| internal   | `localhost:6444` | queue-consumer (1 replica), OTel collectors   |
-| stg        | `localhost:6446` | queue-consumer (2 replicas), OTel collectors  |
-| prod       | `localhost:6445` | queue-consumer (3 replicas), OTel collectors  |
+| management | `127.0.0.1:6447` | Argo CD, otel-gateway, SigNoz                 |
+| internal   | `127.0.0.1:6444` | queue-consumer (1 replica), OTel collectors   |
+| stg        | `127.0.0.1:6446` | queue-consumer (2 replicas), OTel collectors  |
+| prod       | `127.0.0.1:6445` | queue-consumer (3 replicas), OTel collectors  |
 
 One namespace per app (`queue-consumer`, `observability`), the same on every
 cluster. The cluster is the environment boundary, and telemetry carries it as
@@ -80,7 +80,7 @@ Send synthetic traces straight to the gateway:
 
 ```bash
 docker run --rm --network host ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:latest \
-  traces --otlp-insecure --otlp-endpoint localhost:4317 --traces 20 --service telemetrygen
+  traces --otlp-insecure --otlp-endpoint 127.0.0.1:4317 --traces 20 --service telemetrygen
 ```
 
 ## Tear down

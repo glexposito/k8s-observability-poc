@@ -1,5 +1,5 @@
 # SigNoz on management: one OTLP backend behind the gateway. UI at
-# http://localhost:3301. Values: observability/signoz/values.yaml.
+# http://127.0.0.1:3301. Values: observability/signoz/values.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

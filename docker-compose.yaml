@@ -153,7 +153,7 @@ services:
   # The gateway reaches it at http://lgtm:4318 through a fixed IP and
   # management's CoreDNS override (manifests/management/05-cluster-dns.yaml).
   # Its OTLP ports are deliberately not published, because the host's
-  # 4317/4318 belong to the gateway. Grafana: http://localhost:3000 (admin/admin).
+  # 4317/4318 belong to the gateway. Grafana: http://127.0.0.1:3000 (admin/admin).
   lgtm:
     # Pinned so a re-pull never changes Grafana, Loki, Tempo or Prometheus
     # underneath the dashboards. Bump deliberately.
@@ -242,7 +242,7 @@ services:
 
         echo "Applying the root Application..."
         management apply -n argocd -f /argocd/root-app.yaml
-        echo "Managed clusters: internal, stg, prod. Argo CD UI: https://localhost:9000 (admin/123)"
+        echo "Managed clusters: internal, stg, prod. Argo CD UI: https://127.0.0.1:9000 (admin/123)"
 
     networks:
       - k8s-management

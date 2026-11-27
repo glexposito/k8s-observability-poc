@@ -5,7 +5,7 @@ Every long-running service has a **fixed IP**, so DNS overrides and endpoints
 are plain YAML in git with nothing to discover at runtime.
 
 ```
- host (localhost)
+ host (127.0.0.1)
   │ published ports
   ▼
  ┌────────────────────── Docker bridge: k8s-management 172.28.0.0/24 ──────────────────────┐

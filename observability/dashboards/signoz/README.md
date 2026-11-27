@@ -7,7 +7,7 @@ stack (`docker compose down -v` wipes SigNoz's database).
 
 ## Import
 
-1. Open http://localhost:3301 and log in as `admin@playground.local` /
+1. Open http://127.0.0.1:3301 and log in as `admin@playground.local` /
    `Playground123!` (created by SigNoz on startup, see
    `observability/signoz/values.yaml`).
 2. **Dashboards → New dashboard → Import JSON**, paste the file's contents and
