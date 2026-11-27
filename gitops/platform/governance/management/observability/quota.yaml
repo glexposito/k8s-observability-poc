@@ -1,0 +1,13 @@
+# Gateway: 2 replicas (up to 500m / 512Mi each) + 1 surge pod during a rollout.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-quota
+  namespace: observability
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 1Gi
+    limits.cpu: "2"
+    limits.memory: 2Gi
+    pods: "6"

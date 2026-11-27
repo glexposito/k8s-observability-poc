@@ -1,0 +1,15 @@
+# Container defaults, so pods without explicit sizes still fit the quota.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: queue-consumer
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: 100m
+        memory: 64Mi
+      defaultRequest:
+        cpu: 10m
+        memory: 16Mi

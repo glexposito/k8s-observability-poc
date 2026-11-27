@@ -1,0 +1,20 @@
+# The gateway receives OTLP from other clusters through NodePort 30317/30318.
+# kube-proxy masquerades that traffic, so peer IPs can't be pinned reliably.
+# Open the OTLP ports to all sources; everything else stays same-namespace only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace-and-otlp
+  namespace: observability
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+    - ports:
+        - port: 4317
+          protocol: TCP
+        - port: 4318
+          protocol: TCP

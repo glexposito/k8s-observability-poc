@@ -1,0 +1,16 @@
+# Tenant namespace, the same name on every cluster: the cluster is the
+# environment, and deployment.environment.name (stamped by the otel-agent)
+# tells the environments apart in telemetry (docs/namespaces.md). The tenant
+# here is a single workload; with business domains this folder would be
+# domain-1/.
+#
+# `team` is the owner (the tenant): team-1 here, `platform` on platform
+# namespaces. The environment/stage labels come from overlays/<env>.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: queue-consumer
+  labels:
+    team: team-1
+    cost-center: cc-2000
+    managed-by: k8s-observability-poc

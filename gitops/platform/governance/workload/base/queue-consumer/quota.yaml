@@ -1,0 +1,13 @@
+# The tenant's budget. The pod count differs per environment (it tracks that
+# stage's replicas): overlays/<env>/quota.yaml.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: queue-consumer-quota
+  namespace: queue-consumer
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.cpu: "1"
+    limits.memory: 1Gi

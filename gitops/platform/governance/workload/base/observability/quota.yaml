@@ -1,0 +1,14 @@
+# One agent per node (single node here) + otel-k8s-state, with room for
+# a rolling update of each.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: observability-quota
+  namespace: observability
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 1Gi
+    limits.cpu: "1"
+    limits.memory: 2Gi
+    pods: "6"

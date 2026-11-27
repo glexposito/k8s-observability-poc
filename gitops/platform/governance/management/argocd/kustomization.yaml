@@ -1,0 +1,8 @@
+# Platform namespace: Argo CD.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - quota.yaml
+  - limitrange.yaml
+  - networkpolicy.yaml

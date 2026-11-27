@@ -1,0 +1,8 @@
+# Platform namespace: the OpenTelemetry collection layer.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - quota.yaml
+  - limitrange.yaml
+  - networkpolicy.yaml

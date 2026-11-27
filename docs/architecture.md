@@ -82,11 +82,13 @@ sized per environment.
 
 | Path                      | What                                                       |
 | ------------------------- | ---------------------------------------------------------- |
-| `workload/base/`          | Namespaces + their quotas, limits and NetworkPolicies, shared by internal/stg/prod |
+| `workload/base/<namespace>/` | One folder per namespace (`observability`, `queue-consumer`): `namespace.yaml`, `quota.yaml`, `limitrange.yaml`, `networkpolicy.yaml`. Shared by internal/stg/prod |
 | `workload/overlays/<env>/`| Only what differs: `environment`/`stage` labels and the queue-consumer pod quota |
-| `management/`             | management's own namespaces and guardrails                 |
+| `management/<namespace>/` | Same pattern for management's own namespaces (`argocd`, `observability`, `signoz`) |
 
-All of it is plain Kustomize, synced by Argo CD only. Check an overlay with
+All of it is plain Kustomize, synced by Argo CD only. How to add a namespace,
+and why it's laid out this way: [namespaces.md](namespaces.md#10-how-the-namespaces-are-defined).
+Check an overlay with
 `kubectl kustomize gitops/platform/governance/workload/overlays/<env>`.
 
 ## Argo CD (`gitops/argocd/`)

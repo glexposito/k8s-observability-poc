@@ -1,9 +1,13 @@
-# Governance for every workload cluster (internal/stg/prod): the namespaces
-# plus each one's quota, limits and NetworkPolicy.
-# overlays/<env> only adds the environment labels and the pod quota.
+# Governance for every workload cluster (internal/stg/prod): one folder per
+# namespace, each holding that namespace and its guardrails (quota, limits,
+# NetworkPolicy) as plain YAML. overlays/<env> only adds the environment
+# labels and what really differs per environment.
+#
+# Adding a namespace (a tenant, or a platform component): copy a folder,
+# rename it, add it below. Its Argo CD project, if it's a tenant, goes in
+# gitops/argocd/projects/. See docs/namespaces.md.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - namespaces.yaml
-  - queue-consumer-policies.yaml
-  - observability-policies.yaml
+  - observability
+  - queue-consumer

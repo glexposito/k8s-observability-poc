@@ -1,0 +1,12 @@
+# `argocd` is a fixed platform namespace: the Argo CD installer creates it,
+# and this file only adds its labels.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd
+  labels:
+    team: platform
+    environment: management
+    stage: management
+    cost-center: cc-1000
+    managed-by: k8s-observability-poc
