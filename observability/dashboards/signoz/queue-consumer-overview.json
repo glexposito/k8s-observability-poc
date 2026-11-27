@@ -215,7 +215,7 @@
                           "signal": "metrics",
                           "aggregations": [
                             {
-                              "metricName": "traces.span.metrics.duration",
+                              "metricName": "traces.span.metrics.duration.bucket",
                               "spaceAggregation": "p50"
                             }
                           ],
@@ -238,7 +238,7 @@
                           "signal": "metrics",
                           "aggregations": [
                             {
-                              "metricName": "traces.span.metrics.duration",
+                              "metricName": "traces.span.metrics.duration.bucket",
                               "spaceAggregation": "p95"
                             }
                           ],
@@ -261,7 +261,7 @@
                           "signal": "metrics",
                           "aggregations": [
                             {
-                              "metricName": "traces.span.metrics.duration",
+                              "metricName": "traces.span.metrics.duration.bucket",
                               "spaceAggregation": "p99"
                             }
                           ],
@@ -724,7 +724,7 @@
                     "name": "A",
                     "signal": "logs",
                     "filter": {
-                      "expression": "k8s.namespace.name = 'queue-consumer' AND event.domain = 'k8s' AND body CONTAINS 'Warning' AND deployment.environment.name IN $env"
+                      "expression": "k8s.namespace.name = 'queue-consumer' AND attribute.event.domain = 'k8s' AND body.object.type = 'Warning' AND deployment.environment.name IN $env"
                     },
                     "order": [
                       {
