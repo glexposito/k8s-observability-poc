@@ -36,7 +36,8 @@ environment, so names have no stage suffix: queue-consumer lives in
 `queue-consumer` on every cluster. Telemetry tells environments apart by
 `deployment.environment.name`, which the otel-agent stamps. A per-env
 namespace (`queue-consumer-prod`) only makes sense when several
-environments share a cluster.
+environments share a cluster. For the reasoning and Google's guidance behind
+this, see [namespaces.md](namespaces.md).
 
 Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy,
 sized per environment.

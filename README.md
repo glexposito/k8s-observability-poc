@@ -96,3 +96,4 @@ docker compose down -v    # wipe everything
 - [network.md](docs/network.md): Docker network, fixed IPs, ports, DNS overrides, traffic flows, NetworkPolicies
 - [architecture.md](docs/architecture.md): clusters, namespaces, Argo CD, queue-consumer
 - [kustomize-conventions.md](docs/kustomize-conventions.md): the Kustomize standard
+- [namespaces.md](docs/namespaces.md): what gets its own namespace, per Google's GKE multi-tenancy guidance
