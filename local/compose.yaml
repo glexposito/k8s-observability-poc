@@ -167,10 +167,10 @@ services:
 
     volumes:
       - lgtm-data:/data
-      # Dashboards from git (gitops/platform/observability/dashboards/grafana/),
-      # loaded by the provider in lgtm/dashboards-provider.yaml.
+      # Dashboards from git (lgtm/dashboards/), loaded by the provider in
+      # lgtm/dashboards-provider.yaml.
       - ./lgtm/dashboards-provider.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/k8s-observability-poc.yaml:ro
-      - ../gitops/platform/observability/dashboards/grafana:/otel-lgtm/dashboards/k8s-observability-poc:ro
+      - ./lgtm/dashboards:/otel-lgtm/dashboards/k8s-observability-poc:ro
 
     networks:
       k8s-management:

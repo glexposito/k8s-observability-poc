@@ -120,7 +120,7 @@ its own node's agent, so each series has a single producer.
 
 ## Dashboards
 
-`gitops/platform/observability/dashboards/` holds a **queue-consumer overview** dashboard for
+`local/lgtm/dashboards/` (Grafana) and `local/signoz/dashboards/` (SigNoz) hold a **queue-consumer overview** dashboard for
 each backend. Same panels, same `environment` variable:
 
 | Row | Panels |
@@ -131,11 +131,18 @@ each backend. Same panels, same `environment` variable:
 
 | Backend | Files | How it loads |
 | --- | --- | --- |
-| Grafana | `dashboards/grafana/` | Bind-mounted into the `lgtm` container as a provisioning provider. Rescanned every 30 s, so a JSON edit shows up with no restart. |
-| SigNoz | `dashboards/signoz/` | **Imported by hand** (Dashboards → New dashboard → Import JSON). SigNoz has no file provisioning: its built-in dashboards are compiled into the binary, and everything else goes through its API. Steps in `dashboards/signoz/README.md`. |
+| Grafana | `local/lgtm/dashboards/` | Bind-mounted into the `lgtm` container as a provisioning provider. Rescanned every 30 s, so a JSON edit shows up with no restart. |
+| SigNoz | `local/signoz/dashboards/` | **Imported by hand** (Dashboards → New dashboard → Import JSON). SigNoz has no file provisioning: its built-in dashboards are compiled into the binary, and everything else goes through its API. Steps in `local/signoz/dashboards/README.md`. |
 
 Git is the source of truth for both. Grafana enforces it (`allowUiUpdates:
 false`); for SigNoz, export the JSON after editing in the UI and commit it.
+
+**Why they're in `local/`:** Argo CD syncs neither. Compose mounts the Grafana
+ones into the `lgtm` container, and the SigNoz ones are imported by hand, so
+they belong with the rest of the playground, not in `gitops/`. On a real
+platform, dashboards as code would be synced like everything else and live
+under `gitops/`: as Grafana Operator `GrafanaDashboard` resources, or the
+SigNoz Operator's `Dashboard` resource (see `local/signoz/dashboards/README.md`).
 The two use different query languages over the same data: PromQL/LogQL/TraceQL
 in Grafana, where Prometheus rewrites names (`messages.processed` →
 `messages_processed_total`), and SigNoz's query builder, which keeps the

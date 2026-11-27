@@ -7,7 +7,7 @@ The repo has two halves, and only one of them is the pattern:
 | Path      | What                                                                 |
 | --------- | -------------------------------------------------------------------- |
 | `gitops/` | **The pattern.** Everything Argo CD syncs: Argo CD's projects and Applications, platform governance, the observability stack, the apps. |
-| `local/`  | **Laptop scaffolding.** The k3s clusters in Docker, what k3s applies before Argo CD can reach a cluster (CoreDNS overrides, Argo CD's login, Argo CD's installer), and cluster registration. A real platform replaces all of it with its own provisioning. |
+| `local/`  | **Laptop scaffolding.** The k3s clusters in Docker, what k3s applies before Argo CD can reach a cluster (CoreDNS overrides, Argo CD's login, Argo CD's installer), cluster registration, and the dashboards for the playground's backends (not synced by Argo CD). A real platform replaces all of it with its own provisioning, and syncs its dashboards from `gitops/`. |
 
 Nothing in `gitops/` refers to files in `local/`. The few settings that only
 exist because the clusters run in Docker (NodePorts, the `k3s-management`
@@ -21,12 +21,13 @@ local/
   register-clusters.sh       # registers the clusters (labelled Secrets), applies the root app
   k3s/workload/              # applied by k3s on internal/stg/prod
   k3s/management/            # applied by k3s on management (incl. the Argo CD installer)
-  lgtm/                      # Grafana dashboard provider for the lgtm container
+  lgtm/                      # the lgtm container's Grafana dashboards and their provider
+  signoz/dashboards/         # SigNoz dashboards, imported by hand
 gitops/
   argocd/                    # root app, AppProjects, Applications/ApplicationSets
   platform/argocd/           # Argo CD's own Helm values (it manages itself from them)
   platform/governance/       # namespaces, quotas, limits, NetworkPolicies
-  platform/observability/    # collector/SigNoz values, dashboards
+  platform/observability/    # collector, gateway and SigNoz values
   apps/                      # tenant workloads (queue-consumer)
 ```
 
