@@ -1,388 +1,128 @@
 # Namespaces: how to slice a cluster
 
-How to decide what gets its own namespace, based on what Google (GKE), AWS
-(EKS) and Azure (AKS) recommend. Quotes are verbatim from these pages.
+Namespaces are the usual Kubernetes boundary for **logical** multi-tenancy:
+they divide a shared cluster between groups that should not interfere with one
+another. This guide distils the common GKE, EKS, and AKS guidance into a
+decision model; links at the end provide the supporting detail.
+
+## Start with the tenant
+
+A tenant is the group that needs its own resource, access, and network
+boundary. It can be a team, a business domain containing related workloads,
+or one sensitive or independently operated workload.
+
+| Building | Kubernetes |
+| --- | --- |
+| Building | Cluster |
+| Landlord | Platform team |
+| Apartment | Namespace |
+| People in an apartment | Tenant |
+
+Use this test: **who must not be able to consume, change, or observe whose
+resources?** Each answer identifies a tenant.
+
+| Tenant choice | Good fit | Example namespace |
+| --- | --- | --- |
+| Team | A team owns unrelated workloads as one unit | `payments-team` |
+| Domain | Related services share ownership and lifecycle | `payments` |
+| Workload | One app needs distinct limits, permissions, or sensitivity | `settlement-worker` |
+
+Domain is often the most useful default. Split one workload into its own
+namespace when its resource needs, permission model, or isolation needs
+materially differ from the rest of the domain.
+
+## The standard model
+
+Give each tenant one namespace in a cluster. The platform team creates that
+namespace and applies the baseline controls; the tenant deploys and operates
+its workloads within the granted boundary.
+
+Every tenant namespace should have:
+
+- **RBAC:** access scoped to its namespace. Add a `Role` and `RoleBinding`
+  before giving tenant users or CI direct Kubernetes API access.
+- **ResourceQuota:** a ceiling so one tenant cannot exhaust shared capacity.
+- **LimitRange:** sensible defaults and bounds when workloads omit resources.
+- **NetworkPolicy:** deny cross-namespace traffic by default; open only the
+  paths that a real dependency requires.
+
+An Argo CD AppProject can limit where Argo CD deploys. It is not a substitute
+for Kubernetes RBAC and does not control a user's direct API access.
+
+Namespaces are a logical boundary, not a hard security boundary. Use separate
+clusters for hostile, untrusted, or otherwise strongly isolated tenants.
+
+## Environments and names
+
+When environments use separate clusters, use the **same tenant namespace name
+in each cluster**: `payments` in internal, staging, and production—not
+`payments-prod`. The cluster or project identifies the environment; labels and
+telemetry attributes identify it in tooling.
+
+An environment suffix can be appropriate when several environments deliberately
+share one cluster. It is not needed when a cluster already is the environment
+boundary.
+
+This produces a repeatable layout:
+
+```
+internal cluster          staging cluster           production cluster
+├── payments              ├── payments              ├── payments
+├── fulfilment            ├── fulfilment            ├── fulfilment
+└── platform              └── platform              └── platform
+```
+
+Keep platform components in their own namespaces rather than mixing them with
+tenant workloads.
+
+## What the providers agree on
+
+| Topic | Shared guidance |
+| --- | --- |
+| Tenant boundary | Give each team, domain, or workload its own namespace |
+| Baseline controls | Namespace-scoped RBAC, quotas, and NetworkPolicies |
+| Platform role | Platform administrators create and govern tenant namespaces |
+| Strong isolation | Use physically separate clusters for untrusted tenants |
+
+Their emphasis differs:
+
+- **GKE** provides the most prescriptive enterprise model: separate
+  environments by clusters or projects, standardise namespace names, and let
+  the platform team supply the guardrails.
+- **EKS** is most explicit that namespaces are “soft” multi-tenancy and that
+  the cluster is the meaningful hard boundary.
+- **AKS** recommends logical namespace isolation first and permits multiple
+  workloads, teams, or environments in a cluster when that trade-off is
+  acceptable.
+
+These are compatible choices. A platform can adopt GKE's stricter
+cluster-per-environment convention while still following the common advice on
+namespace tenancy.
+
+## Managing namespaces as code
+
+| Approach | Use when | Trade-off |
+| --- | --- | --- |
+| Explicit folder per namespace | Few or moderately many tenants; clarity matters | Guardrail manifests are repeated |
+| Namespace labels + policy engine | A policy engine such as Kyverno is already present and standard controls repeat often | Adds policy design and operational complexity |
+| Multi-tenancy operator | Tenants need self-service namespaces with enforced limits | Adds a platform-specific API and controller |
+
+The explicit approach keeps each namespace and its guardrails easy to review.
+At larger scale, a policy engine can generate quotas, limit ranges,
+NetworkPolicies, and RoleBindings from Namespace labels. Introduce that only
+when it removes a real maintenance burden, not merely to reduce a few clear
+YAML files.
+
+## Takeaway
+
+Choose the tenant first, then give it a namespace with RBAC, a quota, limits,
+and default-deny networking. Separate environments with clusters when that is
+the chosen boundary, retain namespace names across those clusters, and use a
+different cluster when the tenant needs a hard isolation boundary.
 
 ## Sources
 
-**Google (GKE)**, sections 1-8:
-
-- [Best practices for enterprise multi-tenancy](https://docs.cloud.google.com/kubernetes-engine/docs/best-practices/enterprise-multitenancy)
-  ("the enterprise guide"): the practical setup, with an example company.
-- [Multi-tenancy overview](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview)
-  ("the overview"): the concepts.
-
-**AWS (EKS)**, section 9:
-
-- [EKS Best Practices Guide → Tenant Isolation](https://docs.aws.amazon.com/eks/latest/best-practices/tenant-isolation.html)
-- [EKS Blueprints → Teams](https://awslabs.github.io/cdk-eks-blueprints/teams/teams/)
-
-**Azure (AKS)**, section 9:
-
-- [Cluster isolation best practices for AKS](https://learn.microsoft.com/en-us/azure/aks/operator-best-practices-cluster-isolation)
-- [Use AKS in a multitenant solution](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/aks)
-
-**How namespaces are laid out as code**, section 10:
-
-- [Config Sync → Hierarchical repo](https://docs.cloud.google.com/kubernetes-engine/enterprise/config-sync/docs/concepts/hierarchical-repo):
-  "The name of a subdirectory should be the same as the name of the namespace
-  object." (Google now recommends its unstructured format instead; the
-  one-directory-per-namespace idea is what's borrowed here.)
-- [Flux multi-tenancy example](https://github.com/fluxcd/flux2-multi-tenancy):
-  its "**tenants** dir contains namespaces, RBAC and Flux custom resources for
-  registering tenant repositories", per tenant under `tenants/base/<team>/`.
-- [Kyverno → Generate rules](https://kyverno.io/docs/policy-types/cluster-policy/generate/):
-  "Create resources like a NetworkPolicy, ResourceQuota, and RoleBinding when a
-  new Namespace is created", kept in sync with `synchronize`.
-
-## 1. What a tenant is
-
-A **tenant** is a group that shares a cluster with other groups but must be
-kept apart from them. Think of an apartment building:
-
-| Building        | Kubernetes                           |
-| --------------- | ------------------------------------ |
-| the building    | the cluster                          |
-| the landlord    | the platform team, which runs it     |
-| an apartment    | a namespace                          |
-| a tenant        | whoever lives in that namespace      |
-
-The overview:
-
-> "A multi-tenant cluster is shared by multiple users and/or workloads which are referred to as" *tenants*.
-
-Who counts as a tenant is your choice. The enterprise guide gives three
-options:
-
-> "a *tenant* can be defined as any of the following:"
-> - "A team responsible for developing and operating one or more workloads."
-> - "A set of related workloads, whether operated by one or more teams."
-> - "A single workload, such as a Deployment."
-
-| Google's option         | Example namespace | In plain words     |
-| ----------------------- | ----------------- | ------------------ |
-| a team                  | `payments-team`   | per team           |
-| a set of related workloads | `payments`     | **per domain**     |
-| a single workload       | `queue-consumer`  | per app            |
-
-**The test:** ask *"who must not be able to break, see or use up the
-resources of whom?"* That "who" is your tenant.
-
-## 2. One namespace per tenant
-
-The overview:
-
-> "In an enterprise environment, the tenants of a cluster are distinct teams within the organization."
->
-> "Typically, each tenant has a corresponding namespace."
->
-> "Alternative models of multi-tenancy with a tenant per cluster, or a tenant per Google Cloud project, are harder to manage."
-
-The enterprise guide:
-
-> "To provide a logical isolation between tenants that are on the same cluster, implement namespaces."
-
-So: pick your tenant (team, domain or app), then give each one a namespace.
-
-## 3. Don't put the environment in the namespace name
-
-The enterprise guide, under "Standardize namespace naming":
-
-> "avoid tying the environment name (development, staging, and production) to the namespace name"
-
-Environments are separated by **clusters** (or Google Cloud projects), not
-namespaces:
-
-> "projects can be used to segregate environments (for example, production vs. staging) and teams from each other."
->
-> "A folder dedicated for the platform team to manage clusters per environment."
-
-So `payments` exists in the dev, staging and prod clusters under the same
-name. `payments-prod` is the anti-pattern.
-
-## 4. Google's example company
-
-The enterprise guide walks through one company:
-
-- Three top-level folders: **Network Team**, **Cluster Team**, **Tenants**.
-- Three environments: development, staging, production, with separate
-  clusters for each.
-- Tenants called "Tenant A" and "Tenant B". Tenant A's namespace is
-  `tenant-a`.
-- Its starting assumption:
-
-  > "Each tenant is a single team developing a single workload."
-
-Who does what:
-
-> "The platform team owns the clusters and defines the amount of resources each tenant team can use;"
->
-> "Each tenant team should be able to deploy their application through the Kubernetes API"
->
-> "Each tenant should not be able to affect other tenants in the shared cluster, except via explicit design decisions"
-
-Drawn out:
-
-```
-dev cluster          staging cluster        prod cluster
-├── tenant-a         ├── tenant-a           ├── tenant-a      ← same name everywhere
-├── tenant-b         ├── tenant-b           ├── tenant-b
-└── (platform)       └── (platform)         └── (platform)
-```
-
-## 5. Who creates namespaces
-
-Not the tenants. The enterprise guide:
-
-> "As part of the Kubernetes RBAC process, the cluster admin creates namespaces for each tenant group."
->
-> "The Tenant admin manages users (tenant developers) within their respective tenant namespace."
-
-The overview says the same thing: cluster administrators
-
-> "can create namespaces and assign them to namespace administrators."
-
-## 6. What every tenant namespace gets
-
-The enterprise guide's example gives `tenant-a` three things:
-
-**Access rights:** a `RoleBinding` so only Tenant A's group can manage it:
-
-> "Grants access to list and watch deployments in their namespace."
-
-**A NetworkPolicy** that blocks other namespaces:
-
-> "block traffic between namespaces that host different tenants' applications."
-
-```yaml
-# From the enterprise guide
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: deny-all
-  namespace: tenant-a
-spec:
-  podSelector:
-    matchLabels:
-  ingress:
-  - from:
-    - podSelector: {}
-```
-
-The overview explains why this is needed:
-
-> "Network traffic within a namespace is unrestricted. Network traffic between namespaces must be explicitly allowed."
-
-**A ResourceQuota** so one tenant can't starve the rest:
-
-> "Create a resource quota for each namespace based on the number of Pods deployed by each tenant"
-
-In the example, Pods in the `tenant-a` namespace can request up to 16 CPU and
-64 GB of memory. The overview:
-
-> "Resource quotas let you ensure that no tenant uses more than its assigned share of cluster resources."
-
-Neither page mentions LimitRange. This repo adds one anyway, so containers
-without explicit sizes still get defaults that fit inside the quota.
-
-## 7. How this repo maps to it
-
-| Google                                      | This repo                                                  |
-| ------------------------------------------- | ---------------------------------------------------------- |
-| Clusters per environment                    | `internal` / `stg` / `prod` clusters                       |
-| Same namespace name in every environment    | `queue-consumer` on all three, no `-prod` suffix           |
-| Platform team creates namespaces            | `gitops/platform/governance/` + Argo CD (GitOps), not the app (section 10) |
-| RoleBinding per tenant namespace            | Not modelled: this PoC grants tenants no direct Kubernetes API access; the `queue-consumer` AppProject constrains Argo CD only |
-| NetworkPolicy blocking other namespaces     | `workload/base/queue-consumer/networkpolicy.yaml`          |
-| ResourceQuota per tenant namespace          | `workload/base/queue-consumer/quota.yaml`, pod count per environment in `workload/overlays/` |
-| Platform namespaces kept separate           | `otel-collectors`, `otel-gateway`, `argocd`, `signoz`      |
-| Ownership by label, not by namespace        | `team: platform` on all four platform namespaces, `team: team-1` on `queue-consumer` |
-
-The tenant here is **a single workload** (Google's third option), because the
-playground has one app.
-
-This is a GitOps-only PoC: tenants do not authenticate to the Kubernetes API.
-Before giving tenant users or CI direct cluster access, add scoped Kubernetes
-`Role` and `RoleBinding` resources to their namespace; an Argo CD AppProject
-does not grant or restrict Kubernetes API permissions for those users.
-
-## 8. Applying it to domains
-
-With business domains (`domain-1`, `domain-2`, … `domain-x`), the tenant is
-**"a set of related workloads"** (Google's second option): one namespace per
-domain, the same in every cluster.
-
-```
-prod cluster (same layout in internal and stg)
-├── domain-1        ← domain-1 apps    domain=domain-1
-├── domain-2        ← domain-2 apps    domain=domain-2
-├── domain-x        ← domain-x apps    domain=domain-x
-└── otel-collectors ← platform
-```
-
-Each domain namespace gets the starter kit from section 6: access rights for
-the owning team, a NetworkPolicy blocking the other domains (open specific
-paths, like domain-2 → domain-1, on purpose), and a quota sized for the domain.
-
-**When to split an app out of its domain namespace:** when it needs
-different limits or permissions from the rest of the domain, for example a
-heavy batch job or a service holding sensitive data. That's Google's third
-option ("a single workload") applied to just that app.
-
-When a namespace holds several apps, filter telemetry by app as well
-(`service.name`, `k8s.deployment.name`), not by `k8s.namespace.name` alone.
-
-## 9. What AWS (EKS) and Azure (AKS) say
-
-All three agree on the basics: **isolate each tenant in its own namespace**,
-with access rights, a quota and network policies. They differ on how much
-they trust namespaces and on environments.
-
-### AWS: [EKS Best Practices Guide → Tenant Isolation](https://docs.aws.amazon.com/eks/latest/best-practices/tenant-isolation.html)
-
-Tenant = a team or department:
-
-> "Each tenant will typically align to an administrative division such as a department or team."
-
-Namespaces are the basic tool ("soft multi-tenancy"):
-
-> "Namespaces are fundamental to implementing soft multi-tenancy."
->
-> "you should plan to impose quotas on namespaces in a multi-tenant environment."
-
-AWS is the bluntest about the limits. The cluster is "the only construct that
-provides a strong security boundary"; for strong isolation it says:
-
-> "Hard multi-tenancy can be implemented by provisioning separate clusters for each tenant."
-
-It doesn't cover environments (dev/stg/prod).
-
-AWS's open-source [EKS Blueprints](https://awslabs.github.io/cdk-eks-blueprints/teams/teams/)
-automate this: an `ApplicationTeam` gets its own namespace and quotas created
-for it, the same "platform team provisions the starter kit" pattern as
-Google's.
-
-### Azure: [Cluster isolation best practices for AKS](https://learn.microsoft.com/en-us/azure/aks/operator-best-practices-cluster-isolation)
-
-Default to namespaces, not more clusters:
-
-> "Separate teams and projects using logical isolation."
->
-> "Minimize the number of physical AKS clusters you deploy to isolate teams or applications."
->
-> "Kubernetes Namespaces form the logical isolation boundary for workloads and resources."
-
-Separate clusters only for untrusted tenants:
-
-> "For these types of hostile multi-tenant workloads, you should use physically isolated clusters."
-
-On environments, Azure is looser than Google and allows sharing a cluster:
-
-> "With logical isolation, you can use a single AKS cluster for multiple workloads, teams, or environments."
-
-### Azure: [Use AKS in a multitenant solution](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/aks)
-
-> "As a best practice, separate each tenant and its Kubernetes resources into dedicated namespaces."
->
-> "Separate teams within an organization can use namespaces to isolate their projects"
-
-What each namespace carries:
-
-> "RBAC roles and role bindings are namespace-scoped resources"
->
-> "Resource quotas for CPU and memory are namespaced objects."
->
-> "By default, all pods in an AKS cluster can send and receive traffic without restrictions"
-
-### Side by side
-
-| | Google (GKE) | AWS (EKS) | Azure (AKS) |
-| --- | --- | --- | --- |
-| Tenant is | team, set of related workloads, or one workload | team / department | team or project |
-| Tenant gets | a namespace | a namespace | a namespace |
-| In each namespace | RBAC, NetworkPolicy, quota | RBAC, NetworkPolicy, quota | RBAC, NetworkPolicy, quota |
-| Separate clusters for | environments | untrusted tenants ("hard" tenancy) | untrusted tenants |
-| Environments | separate clusters, no env in namespace names | not covered | may share a cluster |
-| LimitRange | not mentioned | not mentioned | not mentioned |
-
-### Same guidance, different tone
-
-All three give the **same core guidance**:
-
-| Point | Google | AWS | Azure |
-| --- | --- | --- | --- |
-| Each tenant gets its own namespace | "Typically, each tenant has a corresponding namespace." | "Namespaces are fundamental to implementing soft multi-tenancy." | "separate each tenant and its Kubernetes resources into dedicated namespaces." |
-| A tenant is usually a team | "the tenants of a cluster are distinct teams within the organization." | "align to an administrative division such as a department or team." | "Separate teams and projects using logical isolation." |
-| Each namespace gets a quota | "Create a resource quota for each namespace" | "you should plan to impose quotas on namespaces" | "Resource quotas for CPU and memory are namespaced objects." |
-| Block traffic between namespaces | "block traffic between namespaces that host different tenants' applications." | (network policies are part of soft multi-tenancy) | "By default, all pods in an AKS cluster can send and receive traffic without restrictions" |
-| Untrusted tenants need separate clusters | "Kubernetes cannot guarantee perfectly secure isolation between tenants" | "provisioning separate clusters for each tenant." | "you should use physically isolated clusters." |
-
-They differ in **tone**:
-
-- **AWS is the most cautious.** Namespaces give only "the semblance of
-  multi-tenancy"; the cluster is "the only construct that provides a strong
-  security boundary". It lays out soft (namespaces) and hard (clusters)
-  tenancy without picking a default.
-- **Azure is the most positive.** Namespaces first: "Minimize the number of
-  physical AKS clusters you deploy to isolate teams or applications."
-- **Google sits in between.** Namespaces per tenant, plus the most detailed
-  setup (folders, projects, example YAML).
-
-They only really **disagree on environments**:
-
-| | Google | AWS | Azure |
-| --- | --- | --- | --- |
-| dev / stg / prod | separate clusters, and "avoid tying the environment name … to the namespace name" | not covered | "you can use a single AKS cluster for multiple workloads, teams, or environments." |
-
-Azure says environments **can** share a cluster, not that they must. So
-Google's rule (a cluster per environment) doesn't conflict with Azure's
-guidance, and AWS is silent.
-
-**Takeaway:** namespace per tenant (team, domain or app) with RBAC, a quota
-and network policies is the guidance all three share. This repo supplies the
-quota and network-policy parts and uses GitOps-only deployment; it deliberately
-omits tenant Kubernetes RBAC. Add scoped `Role`/`RoleBinding` resources before
-granting tenants direct API access. It also follows Google's stricter rule on
-environments: a cluster per environment and the same namespace names in every
-cluster. That setup fits all three vendors.
-
-## 10. How the namespaces are defined
-
-There are three common ways to define namespaces as code, roughly in order
-of scale:
-
-| Approach | What it looks like | Used by |
-| --- | --- | --- |
-| **Folder per namespace, plain YAML** | One directory per namespace holding its `Namespace`, quota, limits and NetworkPolicy, plus a RoleBinding when tenants have direct API access, written out in full. New ones are copied from an existing folder. | The baseline. Config Sync's hierarchical repo (a directory per namespace), Flux's multi-tenancy example (`tenants/base/<team>/`) |
-| **Folder per namespace + a policy engine** | Each folder only declares the `Namespace` with labels; a Kyverno `generate` policy creates and keeps in sync the quota, limits, default-deny NetworkPolicy and RoleBinding for every namespace with a tenant label. | Platforms with many tenants, usually once Kyverno is there for admission rules anyway |
-| **A multi-tenancy operator** | A `Tenant` resource (Capsule), Rancher Projects, OpenShift Projects. Tenants may create their own namespaces within enforced limits. | Self-service tenants. Not this model: here the platform creates namespaces (section 5) |
-
-**This repo uses the first one for its namespaces and guardrails.** Every
-namespace is a folder you can read on its own, with a literal `kind: Namespace`
-and its real name. Tenant RoleBindings are deliberately omitted because this
-PoC uses GitOps only:
-
-```
-gitops/platform/governance/
-  workload/                        # every workload cluster (internal/stg/prod)
-    base/
-      otel-collectors/             # platform namespace
-      queue-consumer/              # tenant namespace
-        namespace.yaml  quota.yaml  limitrange.yaml  networkpolicy.yaml
-    overlays/<env>/                # environment labels + what really differs
-  management/                      # the management cluster
-    argocd/  otel-gateway/  signoz/
-```
-
-**Adding a namespace** (for example `domain-1`): copy `queue-consumer/`,
-rename the folder and the names inside, add it to `workload/base/kustomization.yaml`.
-For a tenant, also add its Argo CD project in `gitops/argocd/projects/`
-(copy `queue-consumer.yaml`). If tenants need direct Kubernetes API access,
-also add a scoped `Role` and `RoleBinding`.
-
-**Next step at scale:** once a policy engine that can generate resources,
-such as Kyverno, runs on the clusters, the per-folder `quota.yaml`,
-`limitrange.yaml` and `networkpolicy.yaml` can become `generate` policies.
-Each folder then shrinks to `namespace.yaml` with labels such as
-`quota-tier: small`, and every tenant namespace gets the same guardrails without
-copying them.
+- [GKE enterprise multi-tenancy](https://docs.cloud.google.com/kubernetes-engine/docs/best-practices/enterprise-multitenancy) and [multi-tenancy overview](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/multitenancy-overview)
+- [EKS tenant isolation](https://docs.aws.amazon.com/eks/latest/best-practices/tenant-isolation.html) and [EKS Blueprints teams](https://awslabs.github.io/cdk-eks-blueprints/teams/teams/)
+- [AKS cluster isolation](https://learn.microsoft.com/en-us/azure/aks/operator-best-practices-cluster-isolation) and [AKS multitenancy](https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/service/aks)
+- [Config Sync repository layouts](https://docs.cloud.google.com/kubernetes-engine/enterprise/config-sync/docs/concepts/hierarchical-repo), [Flux multi-tenancy example](https://github.com/fluxcd/flux2-multi-tenancy), and [Kyverno generated resources](https://kyverno.io/docs/policy-types/cluster-policy/generate/)

@@ -112,4 +112,4 @@ Details in [architecture.md](docs/architecture.md#repo-layout).
 - [observability.md](docs/observability.md): OpenTelemetry agents and gateway, SigNoz, LGTM
 - [network.md](docs/network.md): Docker network, fixed IPs, ports, DNS overrides, traffic flows, NetworkPolicies
 - [architecture.md](docs/architecture.md): clusters, namespaces, Argo CD, queue-consumer
-- [namespaces.md](docs/namespaces.md): what gets its own namespace, per Google's GKE multi-tenancy guidance
+- [namespaces.md](docs/namespaces.md): tenant policy, guardrails, and how to add a namespace
