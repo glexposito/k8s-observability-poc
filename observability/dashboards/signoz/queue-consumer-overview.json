@@ -89,7 +89,7 @@
         "spec": {
           "display": {
             "name": "do_work error ratio",
-            "description": "Share of do_work spans with error status, from the agent's span_metrics connector (traces.span.metrics.calls)."
+            "description": "Share of do_work spans with error status, from the agent's span_metrics connector (traces.span.metrics.calls). An empty chart means no errors: there are no error spans to divide."
           },
           "links": [],
           "plugin": {
@@ -126,7 +126,7 @@
                             }
                           ],
                           "filter": {
-                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND status.code = 'STATUS_CODE_ERROR' AND deployment.environment.name IN $env"
+                            "expression": "resource.service.name = 'queue-consumer' AND span.name = 'do_work' AND status.code = 'STATUS_CODE_ERROR' AND deployment.environment.name IN $env"
                           },
                           "groupBy": [
                             {
@@ -151,7 +151,7 @@
                             }
                           ],
                           "filter": {
-                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                            "expression": "resource.service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
                           },
                           "groupBy": [
                             {
@@ -220,7 +220,7 @@
                             }
                           ],
                           "filter": {
-                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                            "expression": "resource.service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
                           },
                           "groupBy": [
                             {
@@ -243,7 +243,7 @@
                             }
                           ],
                           "filter": {
-                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                            "expression": "resource.service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
                           },
                           "groupBy": [
                             {
@@ -266,7 +266,7 @@
                             }
                           ],
                           "filter": {
-                            "expression": "service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
+                            "expression": "resource.service.name = 'queue-consumer' AND span.name = 'do_work' AND deployment.environment.name IN $env"
                           },
                           "groupBy": [
                             {
@@ -683,7 +683,7 @@
                     "name": "A",
                     "signal": "logs",
                     "filter": {
-                      "expression": "service.name = 'queue-consumer' AND deployment.environment.name IN $env"
+                      "expression": "resource.service.name = 'queue-consumer' AND deployment.environment.name IN $env"
                     },
                     "order": [
                       {
@@ -765,7 +765,7 @@
                     "name": "A",
                     "signal": "traces",
                     "filter": {
-                      "expression": "service.name = 'queue-consumer' AND name = 'do_work' AND deployment.environment.name IN $env"
+                      "expression": "resource.service.name = 'queue-consumer' AND name = 'do_work' AND deployment.environment.name IN $env"
                     },
                     "order": [
                       {
