@@ -74,10 +74,12 @@ manages it.
 3. `argocd-bootstrap` runs `local/register-clusters.sh`: it registers
    internal/stg/prod (and management itself) with Argo CD as labelled
    cluster Secrets, and applies `gitops/argocd/root-app.yaml`.
-   From then on, Argo CD manages everything under `gitops/` from git.
+   From then on, Argo CD manages the declared configuration under `gitops/`
+   from git.
 
-Each file is applied by exactly one of the two: k3s applies `local/k3s/`,
-Argo CD applies `gitops/`.
+Bootstrap deliberately has three actors with separate ownership: k3s applies
+`local/k3s/`, `argocd-bootstrap` applies the initial root Application, and
+Argo CD then syncs the remaining configuration under `gitops/`.
 
 For IPs, ports, DNS and traffic flows, see [network.md](network.md).
 
@@ -102,8 +104,10 @@ namespace (`queue-consumer-prod`) only makes sense when several
 environments share a cluster. For the reasoning and Google's guidance behind
 this, see [namespaces.md](namespaces.md).
 
-Each namespace gets its own ResourceQuota, LimitRange and NetworkPolicy,
-sized per environment.
+Each listed namespace except `signoz` gets a ResourceQuota, LimitRange and
+NetworkPolicy, sized per environment. SigNoz intentionally has only its
+Namespace: its chart owns the ClickHouse sizing, and the gateway and UI need
+unrestricted ingress.
 
 ### Governance (`gitops/platform/governance/`)
 
@@ -111,12 +115,12 @@ sized per environment.
 | ------------------------- | ---------------------------------------------------------- |
 | `workload/base/<namespace>/` | One folder per namespace (`otel-collectors`, `queue-consumer`): `namespace.yaml`, `quota.yaml`, `limitrange.yaml`, `networkpolicy.yaml`. Shared by internal/stg/prod |
 | `workload/overlays/<env>/`| Only what differs: the `platform.example.com/environment` label and the queue-consumer pod quota |
-| `management/<namespace>/` | Same pattern for management's own namespaces (`argocd`, `otel-gateway`, `signoz`) |
+| `management/<namespace>/` | One folder per management namespace: `argocd` and `otel-gateway` have all guardrails; `signoz` intentionally has only its Namespace |
 
-All of it is plain Kustomize, synced by Argo CD only. How to add a namespace,
-and why it's laid out this way: [namespaces.md](namespaces.md#10-how-the-namespaces-are-defined).
-Check an overlay with
-`kubectl kustomize gitops/platform/governance/workload/overlays/<env>`.
+All of it is plain Kustomize, rendered by Argo CD's repo server. The local
+playground deliberately has no host `kubectl`; review rendered manifests in
+the Argo CD UI. How to add a namespace, and why it's laid out this way:
+[namespaces.md](namespaces.md#10-how-the-namespaces-are-defined).
 
 ## Argo CD (`gitops/argocd/`)
 

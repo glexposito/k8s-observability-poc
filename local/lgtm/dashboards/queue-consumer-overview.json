@@ -5,7 +5,7 @@
     "k8s-observability-poc",
     "opentelemetry"
   ],
-  "description": "Same panels as the SigNoz dashboard of the same name. Source: k8s-observability-poc/observability/dashboards.",
+  "description": "Same panels as the SigNoz dashboard of the same name. The JSON in local/lgtm/dashboards is the source of truth; Grafana cannot save UI edits.",
   "editable": true,
   "schemaVersion": 41,
   "version": 1,

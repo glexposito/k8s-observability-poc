@@ -4,7 +4,7 @@
   "spec": {
     "display": {
       "name": "queue-consumer overview",
-      "description": "Same panels as the Grafana dashboard of the same name. Managed in git (k8s-observability-poc/observability/dashboards) and locked; edit the JSON, not the UI."
+      "description": "Same panels as the Grafana dashboard of the same name. The JSON in local/signoz/dashboards is the source of truth: you may edit in the UI, then export and commit the updated JSON."
     },
     "duration": "1h",
     "links": [],

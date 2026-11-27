@@ -1,8 +1,9 @@
 # Observability
 
 All of this is vendor-neutral OpenTelemetry: the upstream
-`opentelemetry-collector` Helm chart, the official `otel/opentelemetry-collector-k8s`
-distribution, OTLP on every hop, and semantic-convention attributes. SigNoz and
+`opentelemetry-collector` Helm chart, the official
+`opentelemetry-collector-k8s` distribution, OTLP on every hop, and
+semantic-convention attributes. SigNoz and
 LGTM are just two OTLP endpoints at the end.
 
 ```

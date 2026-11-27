@@ -17,8 +17,8 @@ and **Grafana LGTM**. KISS.
   them fairly. Adding or swapping a backend means editing one file.
 - **A real instrumented workload:** [queue-consumer](https://github.com/glexposito/queue-consumer),
   a Rust worker using the OTel SDK, runs in every environment (1 / 2 / 3 replicas).
-- **Everything through GitOps:** Argo CD on management deploys all of it from
-  this repo.
+- **GitOps after bootstrap:** Argo CD on management deploys the configuration
+  under `gitops/`; Docker/k3s bootstrap and dashboard loading stay in `local/`.
 
 ## TL;DR
 
@@ -53,8 +53,9 @@ You only need Docker, with about 12-16 GiB of RAM for it.
 | stg        | `127.0.0.1:6446` | queue-consumer (2 replicas), OTel collectors  |
 | prod       | `127.0.0.1:6445` | queue-consumer (3 replicas), OTel collectors  |
 
-One namespace per app (`queue-consumer`, `otel-collectors`), the same on every
-cluster. The cluster is the environment boundary, and telemetry carries it as
+Each workload cluster uses one namespace per app (`queue-consumer`,
+`otel-collectors`), with the same names in internal, stg and prod. The cluster
+is the environment boundary, and telemetry carries it as
 `deployment.environment.name`.
 
 ## Try it
@@ -106,5 +107,4 @@ Details in [architecture.md](docs/architecture.md#repo-layout).
 - [observability.md](docs/observability.md): OpenTelemetry agents and gateway, SigNoz, LGTM
 - [network.md](docs/network.md): Docker network, fixed IPs, ports, DNS overrides, traffic flows, NetworkPolicies
 - [architecture.md](docs/architecture.md): clusters, namespaces, Argo CD, queue-consumer
-- [kustomize-conventions.md](docs/kustomize-conventions.md): the Kustomize standard
 - [namespaces.md](docs/namespaces.md): what gets its own namespace, per Google's GKE multi-tenancy guidance

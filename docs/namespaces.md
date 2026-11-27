@@ -192,14 +192,19 @@ without explicit sizes still get defaults that fit inside the quota.
 | Clusters per environment                    | `internal` / `stg` / `prod` clusters                       |
 | Same namespace name in every environment    | `queue-consumer` on all three, no `-prod` suffix           |
 | Platform team creates namespaces            | `gitops/platform/governance/` + Argo CD (GitOps), not the app (section 10) |
-| RoleBinding per tenant namespace            | Argo CD project `queue-consumer` can only deploy there     |
+| RoleBinding per tenant namespace            | Not modelled: this PoC grants tenants no direct Kubernetes API access; the `queue-consumer` AppProject constrains Argo CD only |
 | NetworkPolicy blocking other namespaces     | `workload/base/queue-consumer/networkpolicy.yaml`          |
 | ResourceQuota per tenant namespace          | `workload/base/queue-consumer/quota.yaml`, pod count per environment in `workload/overlays/` |
 | Platform namespaces kept separate           | `otel-collectors`, `otel-gateway`, `argocd`, `signoz`      |
-| Ownership by label, not by namespace        | `team: platform` on those three, `team: team-1` on `queue-consumer` |
+| Ownership by label, not by namespace        | `team: platform` on all four platform namespaces, `team: team-1` on `queue-consumer` |
 
 The tenant here is **a single workload** (Google's third option), because the
 playground has one app.
+
+This is a GitOps-only PoC: tenants do not authenticate to the Kubernetes API.
+Before giving tenant users or CI direct cluster access, add scoped Kubernetes
+`Role` and `RoleBinding` resources to their namespace; an Argo CD AppProject
+does not grant or restrict Kubernetes API permissions for those users.
 
 ## 8. Applying it to domains
 
@@ -334,10 +339,12 @@ Google's rule (a cluster per environment) doesn't conflict with Azure's
 guidance, and AWS is silent.
 
 **Takeaway:** namespace per tenant (team, domain or app) with RBAC, a quota
-and network policies is the guidance all three share. This repo follows it,
-plus Google's stricter rule on environments: a cluster per environment and
-the same namespace names in every cluster. That setup fits all three
-vendors.
+and network policies is the guidance all three share. This repo supplies the
+quota and network-policy parts and uses GitOps-only deployment; it deliberately
+omits tenant Kubernetes RBAC. Add scoped `Role`/`RoleBinding` resources before
+granting tenants direct API access. It also follows Google's stricter rule on
+environments: a cluster per environment and the same namespace names in every
+cluster. That setup fits all three vendors.
 
 ## 10. How the namespaces are defined
 
@@ -346,12 +353,14 @@ of scale:
 
 | Approach | What it looks like | Used by |
 | --- | --- | --- |
-| **Folder per namespace, plain YAML** | One directory per namespace holding its `Namespace`, quota, limits, NetworkPolicy (and RoleBinding), written out in full. New ones are copied from an existing folder. | The baseline. Config Sync's hierarchical repo (a directory per namespace), Flux's multi-tenancy example (`tenants/base/<team>/`) |
+| **Folder per namespace, plain YAML** | One directory per namespace holding its `Namespace`, quota, limits and NetworkPolicy, plus a RoleBinding when tenants have direct API access, written out in full. New ones are copied from an existing folder. | The baseline. Config Sync's hierarchical repo (a directory per namespace), Flux's multi-tenancy example (`tenants/base/<team>/`) |
 | **Folder per namespace + a policy engine** | Each folder only declares the `Namespace` with labels; a Kyverno `generate` policy creates and keeps in sync the quota, limits, default-deny NetworkPolicy and RoleBinding for every namespace with a tenant label. | Platforms with many tenants, usually once Kyverno is there for admission rules anyway |
 | **A multi-tenancy operator** | A `Tenant` resource (Capsule), Rancher Projects, OpenShift Projects. Tenants may create their own namespaces within enforced limits. | Self-service tenants. Not this model: here the platform creates namespaces (section 5) |
 
-**This repo uses the first one.** Every namespace is a folder you can read on
-its own, with a literal `kind: Namespace` and its real name:
+**This repo uses the first one for its namespaces and guardrails.** Every
+namespace is a folder you can read on its own, with a literal `kind: Namespace`
+and its real name. Tenant RoleBindings are deliberately omitted because this
+PoC uses GitOps only:
 
 ```
 gitops/platform/governance/
@@ -368,11 +377,12 @@ gitops/platform/governance/
 **Adding a namespace** (for example `domain-1`): copy `queue-consumer/`,
 rename the folder and the names inside, add it to `workload/base/kustomization.yaml`.
 For a tenant, also add its Argo CD project in `gitops/argocd/projects/`
-(copy `queue-consumer.yaml`).
+(copy `queue-consumer.yaml`). If tenants need direct Kubernetes API access,
+also add a scoped `Role` and `RoleBinding`.
 
 **Next step at scale:** once a policy engine that can generate resources,
 such as Kyverno, runs on the clusters, the per-folder `quota.yaml`,
 `limitrange.yaml` and `networkpolicy.yaml` can become `generate` policies.
 Each folder then shrinks to `namespace.yaml` with labels such as
-`quota-tier: small`, and every namespace gets the same guardrails without
+`quota-tier: small`, and every tenant namespace gets the same guardrails without
 copying them.

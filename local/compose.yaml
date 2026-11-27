@@ -12,7 +12,7 @@ services:
       - --tls-san=k3s-internal
 
     ports:
-      - "6444:6443"
+      - "127.0.0.1:6444:6443"
 
     volumes:
       - internal-data:/var/lib/rancher/k3s
@@ -46,7 +46,7 @@ services:
       - --tls-san=k3s-stg
 
     ports:
-      - "6446:6443"
+      - "127.0.0.1:6446:6443"
 
     volumes:
       - stg-data:/var/lib/rancher/k3s
@@ -77,7 +77,7 @@ services:
       - --tls-san=k3s-prod
 
     ports:
-      - "6445:6443"
+      - "127.0.0.1:6445:6443"
 
     volumes:
       - prod-data:/var/lib/rancher/k3s
@@ -117,18 +117,20 @@ services:
       - --tls-san=k3s-management
 
     ports:
-      - "6447:6443"
+      # All published ports are loopback-only: this playground has fixed
+      # development credentials and is not intended to be reachable on the LAN.
+      - "127.0.0.1:6447:6443"
       # Argo CD UI - gitops/platform/argocd/values-local.yaml sets
       # server.service.type=NodePort on 30090, so this is reachable directly,
       # no kubectl port-forward.
-      - "9000:30090"
+      - "127.0.0.1:9000:30090"
       # SigNoz UI (gitops/platform/observability/signoz/values-local.yaml, NodePort 30301). 3301 is
       # SigNoz's traditional port and keeps 8080 free for other local tools.
-      - "3301:30301"
+      - "127.0.0.1:3301:30301"
       # OTel gateway OTLP gRPC/HTTP (gitops/platform/observability/otel-gateway/values-local.yaml),
       # so you can also send telemetry from the host straight to the gateway.
-      - "4317:30317"
-      - "4318:30318"
+      - "127.0.0.1:4317:30317"
+      - "127.0.0.1:4318:30318"
 
     volumes:
       - management-data:/var/lib/rancher/k3s
@@ -163,7 +165,7 @@ services:
     hostname: lgtm
 
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
 
     volumes:
       - lgtm-data:/data

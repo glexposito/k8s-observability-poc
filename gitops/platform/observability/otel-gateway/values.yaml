@@ -15,7 +15,8 @@ mode: deployment
 replicaCount: 2
 
 image:
-  repository: otel/opentelemetry-collector-k8s
+  # Collector images moved from Docker Hub to GHCR after v0.123.1.
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
 
 ports:
   otlp:
