@@ -1,5 +1,5 @@
 # Argo CD managing itself: the argo-cd chart with values from
-# gitops/argocd/install/. Something else does the first install, before any
+# gitops/platform/argocd/. Something else does the first install, before any
 # Argo CD exists (locally the k3s HelmChart in local/k3s/management/, on AKS
 # the cluster provisioning); from then on, changing Argo CD means changing
 # those files.
@@ -25,8 +25,8 @@ spec:
       helm:
         releaseName: argocd
         valueFiles:
-          - $values/gitops/argocd/install/values.yaml
-          - $values/gitops/argocd/install/values-local.yaml
+          - $values/gitops/platform/argocd/values.yaml
+          - $values/gitops/platform/argocd/values-local.yaml
     - repoURL: https://github.com/glexposito/k8s-observability-poc.git
       targetRevision: HEAD
       ref: values

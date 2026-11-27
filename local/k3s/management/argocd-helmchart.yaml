@@ -4,7 +4,7 @@
 # (e.g. Terraform's helm_release).
 #
 # Bootstrap only. Argo CD then manages itself from git
-# (gitops/argocd/applications/argocd.yaml + gitops/argocd/install/), so this
+# (gitops/argocd/applications/argocd.yaml + gitops/platform/argocd/), so this
 # holds just what must already match before that first self-sync:
 #   - the chart version: keep it in step with the Application's
 #     targetRevision (if they drift, Argo CD upgrades itself to the git one).

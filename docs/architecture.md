@@ -23,7 +23,8 @@ local/
   k3s/management/            # applied by k3s on management (incl. the Argo CD installer)
   lgtm/                      # Grafana dashboard provider for the lgtm container
 gitops/
-  argocd/                    # Argo CD's own values, root app, AppProjects, Applications
+  argocd/                    # root app, AppProjects, Applications/ApplicationSets
+  platform/argocd/           # Argo CD's own Helm values (it manages itself from them)
   platform/governance/       # namespaces, quotas, limits, NetworkPolicies
   platform/observability/    # collector/SigNoz values, dashboards
   apps/                      # tenant workloads (queue-consumer)
@@ -127,8 +128,7 @@ Check an overlay with
 | `applications/otel-gateway.yaml`           | OTel gateway on management (2 replicas)                  |
 | `applications/signoz.yaml`                 | SigNoz on management                                     |
 | `applications/queue-consumer-appset.yaml`  | queue-consumer, one Application per workload cluster     |
-| `applications/argocd.yaml`                 | Argo CD itself (self-managed)                            |
-| `install/`                                 | Argo CD's Helm values: `values.yaml` + `values-local.yaml` |
+| `applications/argocd.yaml`                 | Argo CD itself (self-managed), with its values from `gitops/platform/argocd/` |
 
 **Argo CD manages itself**, as Argo CD's docs describe ("Argo CD is able to
 manage itself since all settings are represented by Kubernetes manifests";
@@ -137,7 +137,9 @@ Helm chart, same idea). It can't install itself the first time, so k3s
 installs a bare one from `local/k3s/management/argocd-helmchart.yaml`. That
 file holds only what must match before the takeover: the chart version and
 `fullnameOverride`. On its first sync, `applications/argocd.yaml` applies
-everything else from `install/`. From then on, change Argo CD only there (and
+everything else from `gitops/platform/argocd/` (`values.yaml` +
+`values-local.yaml`), like every other platform chart's values under
+`gitops/platform/`. From then on, change Argo CD only there (and
 the chart version in both files). On AKS, the bootstrap install belongs to the
 cluster provisioning instead (e.g. Terraform's `helm_release`, ignoring later
 changes). The Application has no resources-finalizer, so deleting it never

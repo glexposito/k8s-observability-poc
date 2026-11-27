@@ -1,5 +1,6 @@
-# Argo CD's own Helm values (argo-cd chart). Argo CD manages itself from these
-# (applications/argocd.yaml), applying them on its first self-sync after the
+# Argo CD's own Helm values (argo-cd chart), next to every other platform
+# chart's values in gitops/platform/. Argo CD manages itself from these
+# (gitops/argocd/applications/argocd.yaml), applying them on its first self-sync after the
 # bootstrap install (locally local/k3s/management/argocd-helmchart.yaml).
 # fullnameOverride must match the bootstrap install.
 # Laptop-only settings (NodePort, fixed login, URL): values-local.yaml.

@@ -118,7 +118,7 @@ services:
 
     ports:
       - "6447:6443"
-      # Argo CD UI - gitops/argocd/install/values-local.yaml sets
+      # Argo CD UI - gitops/platform/argocd/values-local.yaml sets
       # server.service.type=NodePort on 30090, so this is reachable directly,
       # no kubectl port-forward.
       - "9000:30090"
