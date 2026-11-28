@@ -31,6 +31,49 @@ behind the node address and cross-cluster traffic does not use those CIDRs.
 
 LGTM's OTLP ports remain private; host traffic uses the gateway.
 
+## Local playground versus production
+
+The Docker port mappings and explicit NodePorts are local scaffolding, not the
+normal public interface of a production workload.
+
+| Concept | This playground | Production expectation |
+| --- | --- | --- |
+| `ClusterIP` Service | A virtual `10.43.0.0/16` address, reachable only inside its k3s cluster | Same: use it for application-to-application traffic |
+| Pod IP | A `10.42.0.0/16` address, reachable only inside its k3s cluster | Same: clients never target Pods directly |
+| NodePort | Fixed ports such as gateway `30317`, reached at `k3s-management:30317` | May be an implementation detail of a load balancer; clients should not depend on node IPs or ports |
+| Docker port publishing | `127.0.0.1:4317` maps to the management node's NodePort `30317` | Does not exist; k3s nodes are not Docker containers on an operator's laptop |
+| `hostPort` | The node-local collector listens on `4318` for apps on that node | Use only when a node-local agent needs it; it is not a general service exposure mechanism |
+
+**NodePort example — Argo CD.** A browser calls
+`https://127.0.0.1:9000`. Docker maps that laptop port to
+`k3s-management:30090`; NodePort `30090` then sends the request through the
+Argo CD Service to an Argo CD server Pod. The first mapping is Docker-only;
+the middle hop is Kubernetes NodePort.
+
+```text
+browser :9000 → Docker → management node :30090 → Argo CD Service → server Pod
+```
+
+For a public HTTP application, the usual production path is:
+
+```
+https://app.example.com
+  → public load balancer
+  → Gateway controller
+  → application ClusterIP Service
+  → ready application Pod
+```
+
+The Gateway owns TLS, host/path routing, and load balancing. The application
+keeps a normal `ClusterIP` Service; it does not get a public NodePort. Use a
+`LoadBalancer` Service for a directly exposed service when that is the
+platform standard. For non-HTTP protocols, choose the platform's
+load-balancer or gateway pattern rather than exposing node ports directly.
+Kubernetes recommends Gateway API for new HTTP routing; Ingress remains
+supported but is frozen. See [Services](https://kubernetes.io/docs/concepts/services-networking/service/),
+[Gateway API](https://gateway-api.sigs.k8s.io/), and
+[Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/).
+
 ## DNS
 
 Docker containers can resolve each other through Docker DNS, but pods use
